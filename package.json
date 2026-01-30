@@ -1,0 +1,15 @@
+{
+  "name": "mx-dialpad-config",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "cli": "node index.js",
+    "list": "node list-devices.js"
+  },
+  "dependencies": {
+    "node-hid": "^3.1.0",
+    "express": "^4.18.0",
+    "socket.io": "^4.6.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "buttons": {
+    "1:8": "Back",
+    "1:16": "Forward",
+    "1:32": "Left",
+    "1:64": "Right"
+  },
+  "scrollWheels": {
+    "6": "Scroll",
+    "7": "Jog"
+  }
+}
