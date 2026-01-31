@@ -276,6 +276,79 @@
         <p>Reports received: <strong id="reportCount">0</strong></p>
       </div>
       
+      <!-- Jog Wheel Visualization -->
+      <div class="card">
+        <h2>Jog Wheel Position</h2>
+        <div style="text-align: center;">
+          <svg width="200" height="200" style="margin: 0 auto; display: block;">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+            <circle id="jogProgress" cx="100" cy="100" r="80" fill="none" stroke="#667eea" stroke-width="10"
+                    stroke-dasharray="502.65" stroke-dashoffset="502.65"
+                    transform="rotate(-90 100 100)" stroke-linecap="round"/>
+            <text x="100" y="100" text-anchor="middle" dy=".3em" font-size="24" font-weight="bold" fill="#333" id="jogPosition">0</text>
+          </svg>
+          <div style="margin-top: 12px; display: flex; justify-content: space-around;">
+            <div>
+              <div style="font-size: 11px; color: #999;">Total Scrolls</div>
+              <div style="font-size: 18px; font-weight: bold;" id="jogScrolls">0</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Last Speed</div>
+              <div style="font-size: 18px; font-weight: bold;" id="jogSpeed">—</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Highest Speed</div>
+              <div style="font-size: 18px; font-weight: bold; color: #ff4d4f;" id="jogHighestSpeed">0</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Direction</div>
+              <div style="font-size: 18px; font-weight: bold;" id="jogDirection">—</div>
+            </div>
+          </div>
+          <button onclick="resetJogPosition()" style="margin-top: 12px; padding: 6px 16px; font-size: 12px; background: #faad14; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Reset Position
+          </button>
+        </div>
+      </div>
+      
+      <!-- Scroll Wheel Visualization -->
+      <div class="card">
+        <h2>Scroll Wheel Position</h2>
+        <div style="text-align: center;">
+          <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+            <div style="position: relative; width: 40px; height: 300px; background: #e0e0e0; border-radius: 20px; overflow: hidden;">
+              <div id="scrollProgress" style="position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #52c41a, #91d5ff); transition: height 0.1s ease-out; height: 50%;"></div>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 2px; height: 100%; background: rgba(0,0,0,0.2);"></div>
+            </div>
+            <div style="text-align: left;">
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 32px; font-weight: bold;" id="scrollPosition">0</div>
+                <div style="font-size: 11px; color: #999;">Position</div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 18px; font-weight: bold;" id="scrollScrolls">0</div>
+                <div style="font-size: 11px; color: #999;">Total Scrolls</div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 18px; font-weight: bold;" id="scrollSpeed">—</div>
+                <div style="font-size: 11px; color: #999;">Last Speed</div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 18px; font-weight: bold; color: #ff4d4f;" id="scrollHighestSpeed">0</div>
+                <div style="font-size: 11px; color: #999;">Highest Speed</div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 18px; font-weight: bold;" id="scrollDirection">—</div>
+                <div style="font-size: 11px; color: #999;">Direction</div>
+              </div>
+            </div>
+          </div>
+          <button onclick="resetScrollPosition()" style="margin-top: 12px; padding: 6px 16px; font-size: 12px; background: #faad14; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Reset Position
+          </button>
+        </div>
+      </div>
+      
       <!-- Buttons Mapping -->
       <div class="card">
         <h2>Button Mappings</h2>
@@ -323,6 +396,22 @@
     let config = { buttons: {}, scrollWheels: {} };
     let logEntries = [];
     const MAX_LOG_ENTRIES = 100;
+    let jogWheelData = {
+      position: 0,
+      totalScrolls: 0,
+      lastDirection: null,
+      highestSpeed: 0,
+      currentSeriesHighest: 0,
+      debounceTimer: null
+    };
+    let scrollWheelData = {
+      position: 0,
+      totalScrolls: 0,
+      lastDirection: null,
+      highestSpeed: 0,
+      currentSeriesHighest: 0,
+      debounceTimer: null
+    };
     
     // Socket events
     socket.on('connect', () => {
@@ -461,6 +550,149 @@
       }
     }
     
+    // Update jog wheel visualization
+    function updateJogWheel(event) {
+      // Update position
+      jogWheelData.position = event.position;
+      jogWheelData.totalScrolls++;
+      jogWheelData.lastDirection = event.direction;
+      
+      // Track highest speed in current series
+      if (event.amount > jogWheelData.currentSeriesHighest) {
+        jogWheelData.currentSeriesHighest = event.amount;
+        jogWheelData.highestSpeed = event.amount;
+        document.getElementById('jogHighestSpeed').textContent = event.amount;
+      }
+      
+      // Clear existing debounce timer
+      if (jogWheelData.debounceTimer) {
+        clearTimeout(jogWheelData.debounceTimer);
+      }
+      
+      // Set new debounce timer - reset series after 250ms of no movement
+      jogWheelData.debounceTimer = setTimeout(() => {
+        jogWheelData.currentSeriesHighest = 0;
+      }, 250);
+      
+      // Update position text
+      document.getElementById('jogPosition').textContent = event.position;
+      
+      // Update progress circle (wrap around at 360)
+      const normalizedPos = ((event.position % 360) + 360) % 360;
+      const circumference = 502.65; // 2 * PI * 80
+      const offset = circumference - (normalizedPos / 360) * circumference;
+      document.getElementById('jogProgress').style.strokeDashoffset = offset;
+      
+      // Update stats
+      document.getElementById('jogScrolls').textContent = jogWheelData.totalScrolls;
+      document.getElementById('jogDirection').textContent = event.direction === 'up' ? '↑' : '↓';
+      document.getElementById('jogDirection').style.color = event.direction === 'up' ? '#52c41a' : '#ff4d4f';
+      
+      // Update speed
+      document.getElementById('jogSpeed').textContent = event.amount;
+      const speedColor = event.amount > 50 ? '#ff4d4f' : event.amount > 20 ? '#faad14' : '#52c41a';
+      document.getElementById('jogSpeed').style.color = speedColor;
+    }
+    
+    function resetJogPosition() {
+      if (jogWheelData.debounceTimer) {
+        clearTimeout(jogWheelData.debounceTimer);
+      }
+      jogWheelData = {
+        position: 0,
+        totalScrolls: 0,
+        lastDirection: null,
+        highestSpeed: 0,
+        currentSeriesHighest: 0,
+        debounceTimer: null
+      };
+      document.getElementById('jogPosition').textContent = '0';
+      document.getElementById('jogProgress').style.strokeDashoffset = '502.65';
+      document.getElementById('jogScrolls').textContent = '0';
+      document.getElementById('jogDirection').textContent = '—';
+      document.getElementById('jogDirection').style.color = '#333';
+      document.getElementById('jogSpeed').textContent = '—';
+      document.getElementById('jogSpeed').style.color = '#333';
+      document.getElementById('jogHighestSpeed').textContent = '0';
+      showToast('🔄 Jog wheel position reset');
+    }
+    
+    // Update scroll wheel visualization
+    function updateScrollWheel(event) {
+      // Update position
+      scrollWheelData.position = event.position;
+      scrollWheelData.totalScrolls++;
+      scrollWheelData.lastDirection = event.direction;
+      
+      // Track highest speed in current series
+      if (event.amount > scrollWheelData.currentSeriesHighest) {
+        scrollWheelData.currentSeriesHighest = event.amount;
+        scrollWheelData.highestSpeed = event.amount;
+        document.getElementById('scrollHighestSpeed').textContent = event.amount;
+      }
+      
+      // Clear existing debounce timer
+      if (scrollWheelData.debounceTimer) {
+        clearTimeout(scrollWheelData.debounceTimer);
+      }
+      
+      // Set new debounce timer - reset series after 250ms of no movement
+      scrollWheelData.debounceTimer = setTimeout(() => {
+        scrollWheelData.currentSeriesHighest = 0;
+      }, 250);
+      
+      // Update position text
+      document.getElementById('scrollPosition').textContent = event.position;
+      
+      // Update vertical bar (center at 50%, goes up/down from there)
+      // Normalize position to 0-100% range for visual
+      const maxVisualRange = 500; // Visual range of ±500
+      const normalizedPos = Math.max(-maxVisualRange, Math.min(maxVisualRange, event.position));
+      const percentage = ((normalizedPos / maxVisualRange) * 50) + 50; // Convert to 0-100%
+      document.getElementById('scrollProgress').style.height = percentage + '%';
+      
+      // Color based on position
+      if (event.position > 0) {
+        document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #52c41a, #91d5ff)';
+      } else {
+        document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #ff4d4f, #ffa39e)';
+      }
+      
+      // Update stats
+      document.getElementById('scrollScrolls').textContent = scrollWheelData.totalScrolls;
+      document.getElementById('scrollDirection').textContent = event.direction === 'up' ? '↑' : '↓';
+      document.getElementById('scrollDirection').style.color = event.direction === 'up' ? '#52c41a' : '#ff4d4f';
+      
+      // Update speed
+      document.getElementById('scrollSpeed').textContent = event.amount;
+      const speedColor = event.amount > 50 ? '#ff4d4f' : event.amount > 20 ? '#faad14' : '#52c41a';
+      document.getElementById('scrollSpeed').style.color = speedColor;
+    }
+    
+    function resetScrollPosition() {
+      if (scrollWheelData.debounceTimer) {
+        clearTimeout(scrollWheelData.debounceTimer);
+      }
+      scrollWheelData = {
+        position: 0,
+        totalScrolls: 0,
+        lastDirection: null,
+        highestSpeed: 0,
+        currentSeriesHighest: 0,
+        debounceTimer: null
+      };
+      document.getElementById('scrollPosition').textContent = '0';
+      document.getElementById('scrollProgress').style.height = '50%';
+      document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #52c41a, #91d5ff)';
+      document.getElementById('scrollScrolls').textContent = '0';
+      document.getElementById('scrollDirection').textContent = '—';
+      document.getElementById('scrollDirection').style.color = '#333';
+      document.getElementById('scrollSpeed').textContent = '—';
+      document.getElementById('scrollSpeed').style.color = '#333';
+      document.getElementById('scrollHighestSpeed').textContent = '0';
+      showToast('🔄 Scroll wheel position reset');
+    }
+    
     // Update log
     function updateLog(report) {
       const logDiv = document.getElementById('log');
@@ -507,7 +739,20 @@
           const isKnown = !event.name.startsWith('Unknown Scroll');
           if (isKnown) className += ' known';
           const checkmark = isKnown ? ' ✓' : '';
-          message = `<span class="event-badge scroll">SCROLL</span> ${event.name}${checkmark} ${event.direction.toUpperCase()} by ${event.amount} (pos: ${event.position})`;
+          
+          // Show raw velocity value if available
+          const velocityInfo = event.rawValue ? ` [velocity: ${event.rawValue}]` : '';
+          message = `<span class="event-badge scroll">SCROLL</span> ${event.name}${checkmark} ${event.direction.toUpperCase()} by ${event.amount}${velocityInfo} (pos: ${event.position})`;
+          
+          // Update jog wheel visualization if this is the jog wheel
+          if (event.name === 'Jog' || event.name.includes('Jog')) {
+            updateJogWheel(event);
+          }
+          
+          // Update scroll wheel visualization if this is the scroll wheel
+          if (event.name === 'Scroll' || event.name.includes('Scroll')) {
+            updateScrollWheel(event);
+          }
           
           // Only show "Add Mapping" for unknown scrolls
           if (event.name.startsWith('Unknown Scroll')) {
@@ -632,6 +877,7 @@
     function clearLog() {
       logEntries = [];
       document.getElementById('log').innerHTML = '';
+      showToast('🗑️ Log cleared');
     }
   </script>
 </body>
