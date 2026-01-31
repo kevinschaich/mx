@@ -282,19 +282,81 @@
     <h1>🎛️ MX Dialpad Configuration</h1>
     
     <div class="grid">
-      <!-- Status Card -->
+      <!-- JOG WHEEL ROW -->
+      <!-- Jog Wheel: Velocity & Input -->
       <div class="card">
-        <h2>Device Status</h2>
-        <div class="status">
-          <div class="status-dot" id="statusDot"></div>
-          <span id="statusText">Disconnected</span>
+        <h2>🎯 Jog Wheel: Velocity & Input</h2>
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; gap: 20px;">
+            <!-- Friction Control -->
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="font-weight: 500;">Friction:</label>
+                <span style="font-weight: bold; color: #667eea;" id="frictionValue">48</span>
+              </div>
+              <input type="range" id="frictionSlider" min="5" max="100" value="50" 
+                     oninput="updateFriction(this.value)"
+                     style="width: 100%; cursor: pointer;">
+              <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                Lower = more momentum
+              </div>
+            </div>
+            <!-- Sensitivity Control -->
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label style="font-weight: 500;">Sensitivity:</label>
+                <span style="font-weight: bold; color: #52c41a;" id="sensitivityValue">50</span>
+              </div>
+              <input type="range" id="sensitivitySlider" min="1" max="100" value="50" 
+                     oninput="updateSensitivity(this.value)"
+                     style="width: 100%; cursor: pointer;">
+              <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                Output movement scale
+              </div>
+            </div>
+          </div>
         </div>
-        <p>Reports received: <strong id="reportCount">0</strong></p>
+        <div style="text-align: center; background: #f9f9f9; padding: 16px; border-radius: 8px;">
+          <canvas id="jogCurveCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
+          <div style="margin-top: 12px; display: flex; justify-content: space-around; font-size: 12px;">
+            <div>
+              <div style="color: #999;">Raw Input</div>
+              <div style="font-size: 20px; font-weight: bold; color: #faad14;" id="jogCurrentInput">0</div>
+            </div>
+            <div>
+              <div style="color: #999;">Velocity</div>
+              <div style="font-size: 20px; font-weight: bold; color: #667eea;" id="jogCurrentVelocity">0</div>
+            </div>
+            <div>
+              <div style="color: #999;">Multiplier</div>
+              <div style="font-size: 20px; font-weight: bold; color: #52c41a;" id="jogEffectiveness">0.0x</div>
+            </div>
+          </div>
+        </div>
       </div>
       
-      <!-- Jog Wheel Visualization -->
+      <!-- Jog Wheel: Timeline -->
       <div class="card">
-        <h2>Jog Wheel Position</h2>
+        <h2>🎯 Jog Wheel: Timeline</h2>
+        <div style="text-align: center; background: #f9f9f9; padding: 16px; border-radius: 8px;">
+          <canvas id="jogTimelineCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
+          <div style="margin-top: 12px; display: flex; justify-content: space-around; font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <div style="width: 12px; height: 12px; background: #faad14; border-radius: 2px;"></div>
+              <span>Raw Input</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <div style="width: 12px; height: 12px; background: #667eea; border-radius: 2px;"></div>
+              <span>Velocity (with friction)</span>
+            </div>
+          </div>
+          <div style="margin-top: 8px; font-size: 11px; color: #999;">Last 3 seconds</div>
+        </div>
+      </div>
+      
+      <!-- Jog Wheel: Position Visualization -->
+      <div class="card">
+        <h2>🎯 Jog Wheel: Position</h2>
         <div style="text-align: center;">
           <svg width="200" height="200" style="margin: 0 auto; display: block;">
             <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" stroke-width="10"/>
@@ -327,100 +389,34 @@
         </div>
       </div>
       
-      <!-- Scroll Wheel Visualization -->
+      <!-- SCROLL WHEEL ROW -->
+      <!-- Scroll Wheel: Velocity & Input -->
       <div class="card">
-        <h2>Scroll Wheel Position</h2>
-        <div style="text-align: center;">
-          <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
-            <div style="position: relative; width: 40px; height: 300px; background: #e0e0e0; border-radius: 20px; overflow: hidden;">
-              <div id="scrollProgress" style="position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #52c41a, #91d5ff); transition: height 0.1s ease-out; height: 50%;"></div>
-              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 2px; height: 100%; background: rgba(0,0,0,0.2);"></div>
-            </div>
-            <div style="text-align: left;">
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 32px; font-weight: bold;" id="scrollPosition">0</div>
-                <div style="font-size: 11px; color: #999;">Position</div>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 18px; font-weight: bold;" id="scrollScrolls">0</div>
-                <div style="font-size: 11px; color: #999;">Total Scrolls</div>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 18px; font-weight: bold;" id="scrollSpeed">—</div>
-                <div style="font-size: 11px; color: #999;">Last Speed</div>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 18px; font-weight: bold; color: #ff4d4f;" id="scrollHighestSpeed">0</div>
-                <div style="font-size: 11px; color: #999;">Highest Speed</div>
-              </div>
-              <div style="margin-bottom: 12px;">
-                <div style="font-size: 18px; font-weight: bold;" id="scrollDirection">—</div>
-                <div style="font-size: 11px; color: #999;">Direction</div>
-              </div>
-            </div>
-          </div>
-          <button onclick="resetScrollPosition()" style="margin-top: 12px; padding: 6px 16px; font-size: 12px; background: #faad14; color: white; border: none; border-radius: 4px; cursor: pointer;">
-            Reset Position
-          </button>
-        </div>
-      </div>
-      
-      <!-- Buttons Mapping -->
-      <div class="card">
-        <h2>Button Mappings</h2>
-        <div id="buttonMappings"></div>
-        <div class="add-mapping">
-          <input type="number" id="newButtonByte" placeholder="Byte" style="width: 70px;">
-          <input type="number" id="newButtonBit" placeholder="Bit (optional)" style="width: 100px;">
-          <input type="text" id="newButtonName" placeholder="Button name">
-          <button class="primary" onclick="addButtonMapping()">Add</button>
-        </div>
-      </div>
-      
-      <!-- Scroll Wheel Mapping -->
-      <div class="card">
-        <h2>Scroll Wheel Mappings</h2>
-        <div id="scrollMappings"></div>
-        <div class="add-mapping">
-          <input type="number" id="newScrollByte" placeholder="Byte index" style="width: 100px;">
-          <input type="text" id="newScrollName" placeholder="Wheel name">
-          <button class="primary" onclick="addScrollMapping()">Add</button>
-        </div>
-      </div>
-      
-      <!-- Velocity & Input Visualization -->
-      <div class="card">
-        <h2>Velocity & Input</h2>
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Easing Function:</label>
-          <div id="easingPicker" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px;">
-            <!-- Easing function previews will be inserted here -->
-          </div>
-        </div>
+        <h2>🔄 Scroll Wheel: Velocity & Input</h2>
         <div style="text-align: center; background: #f9f9f9; padding: 16px; border-radius: 8px;">
-          <canvas id="curveCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
+          <canvas id="scrollCurveCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
           <div style="margin-top: 12px; display: flex; justify-content: space-around; font-size: 12px;">
             <div>
               <div style="color: #999;">Raw Input</div>
-              <div style="font-size: 20px; font-weight: bold; color: #faad14;" id="currentInput">0</div>
+              <div style="font-size: 20px; font-weight: bold; color: #faad14;" id="scrollCurrentInput">0</div>
             </div>
             <div>
               <div style="color: #999;">Velocity</div>
-              <div style="font-size: 20px; font-weight: bold; color: #667eea;" id="currentVelocity">0</div>
+              <div style="font-size: 20px; font-weight: bold; color: #667eea;" id="scrollCurrentVelocity">0</div>
             </div>
             <div>
               <div style="color: #999;">Multiplier</div>
-              <div style="font-size: 20px; font-weight: bold; color: #52c41a;" id="effectiveness">0.0x</div>
+              <div style="font-size: 20px; font-weight: bold; color: #52c41a;" id="scrollEffectiveness">0.0x</div>
             </div>
           </div>
         </div>
       </div>
       
-      <!-- Input vs Velocity Timeline -->
+      <!-- Scroll Wheel: Timeline -->
       <div class="card">
-        <h2>Input vs Velocity Timeline</h2>
+        <h2>🔄 Scroll Wheel: Timeline</h2>
         <div style="text-align: center; background: #f9f9f9; padding: 16px; border-radius: 8px;">
-          <canvas id="timelineCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
+          <canvas id="scrollTimelineCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
           <div style="margin-top: 12px; display: flex; justify-content: space-around; font-size: 11px;">
             <div style="display: flex; align-items: center; gap: 4px;">
               <div style="width: 12px; height: 12px; background: #faad14; border-radius: 2px;"></div>
@@ -435,7 +431,53 @@
         </div>
       </div>
       
-      <!-- Actions -->
+      <!-- Scroll Wheel: Position Visualization -->
+      <div class="card">
+        <h2>🔄 Scroll Wheel: Position</h2>
+        <div style="text-align: center;">
+          <svg width="200" height="200" style="margin: 0 auto; display: block;">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+            <circle id="scrollProgress" cx="100" cy="100" r="80" fill="none" stroke="#52c41a" stroke-width="10"
+                    stroke-dasharray="502.65" stroke-dashoffset="502.65"
+                    transform="rotate(-90 100 100)" stroke-linecap="round"/>
+            <text x="100" y="100" text-anchor="middle" dy=".3em" font-size="24" font-weight="bold" fill="#333" id="scrollPosition">0</text>
+          </svg>
+          <div style="margin-top: 12px; display: flex; justify-content: space-around;">
+            <div>
+              <div style="font-size: 11px; color: #999;">Total Scrolls</div>
+              <div style="font-size: 18px; font-weight: bold;" id="scrollScrolls">0</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Last Speed</div>
+              <div style="font-size: 18px; font-weight: bold;" id="scrollSpeed">—</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Highest Speed</div>
+              <div style="font-size: 18px; font-weight: bold; color: #ff4d4f;" id="scrollHighestSpeed">0</div>
+            </div>
+            <div>
+              <div style="font-size: 11px; color: #999;">Direction</div>
+              <div style="font-size: 18px; font-weight: bold;" id="scrollDirection">—</div>
+            </div>
+          </div>
+          <button onclick="resetScrollPosition()" style="margin-top: 12px; padding: 6px 16px; font-size: 12px; background: #faad14; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Reset Position
+          </button>
+        </div>
+      </div>
+      
+      <!-- BOTTOM SECTION -->
+      <!-- Status Card -->
+      <div class="card">
+        <h2>Device Status</h2>
+        <div class="status">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusText">Disconnected</span>
+        </div>
+        <p>Reports received: <strong id="reportCount">0</strong></p>
+      </div>
+      
+      <!-- Buttons Mapping -->
       <div class="card">
         <h2>Actions</h2>
         <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
@@ -482,73 +524,65 @@
       animationFrame: null
     };
     
-    // Timeline data tracking
+    // Timeline data tracking (separate for each wheel)
     const TIMELINE_DURATION = 3000; // 3 seconds in ms
-    let timelineData = {
+    let jogTimelineData = {
+      inputs: [], // [{time, value}]
+      velocities: [], // [{time, value}]
+      lastUpdateTime: Date.now()
+    };
+    let scrollTimelineData = {
       inputs: [], // [{time, value}]
       velocities: [], // [{time, value}]
       lastUpdateTime: Date.now()
     };
     
-    // Input display tracking (for bar chart)
-    let inputDisplayData = {
+    // Input display tracking (for bar charts - separate for each wheel)
+    let jogInputDisplayData = {
       value: 0,
       lastInputTime: 0,
       holdDuration: 200 // Hold input display for 200ms after last input
     };
+    let scrollInputDisplayData = {
+      value: 0,
+      lastInputTime: 0,
+      holdDuration: 200
+    };
     
     // Physics constants
-    const FRICTION = 0.92; // Velocity multiplier per frame (closer to 1 = less friction)
     const VELOCITY_THRESHOLD = 0.1; // Stop animating below this velocity
     const TARGET_MULTIPLIER = 2.5; // How much to scale input speed for target velocity
-    const ACCELERATION_RATE = 0.15; // How quickly to approach target velocity
     
-    // Current easing function
-    let currentEasingFunction = 'easeOutQuad';
+    // Global friction setting (0-100, where 50 is baseline)
+    let globalFriction = 50;
     
-    // Easing function metadata
-    const easingMetadata = [
-      { id: 'linear', name: 'Linear' },
-      { id: 'easeInQuad', name: 'Ease In' },
-      { id: 'easeOutQuad', name: 'Ease Out' },
-      { id: 'easeInOutQuad', name: 'In-Out' },
-      { id: 'easeInCubic', name: 'Cubic In' },
-      { id: 'easeOutCubic', name: 'Cubic Out' },
-      { id: 'easeInOutCubic', name: 'Cubic In-Out' },
-      { id: 'easeInExpo', name: 'Expo In' },
-      { id: 'easeOutExpo', name: 'Expo Out' },
-      { id: 'easeInOutExpo', name: 'Expo In-Out' }
-    ];
-    
-    // Easing functions for acceleration curves
-    const easingFunctions = {
-      linear: (t) => t,
-      easeInQuad: (t) => t * t,
-      easeOutQuad: (t) => t * (2 - t),
-      easeInOutQuad: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-      easeInCubic: (t) => t * t * t,
-      easeOutCubic: (t) => (--t) * t * t + 1,
-      easeInOutCubic: (t) => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
-      easeInExpo: (t) => t === 0 ? 0 : Math.pow(2, 10 * (t - 1)),
-      easeOutExpo: (t) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
-      easeInOutExpo: (t) => {
-        if (t === 0 || t === 1) return t;
-        return t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2;
-      }
-    };
+    // Global sensitivity setting (1-100, where 50 is baseline)
+    let globalSensitivity = 50;
     
     // Socket events
     socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('✅ Socket.IO connected to server');
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error('❌ Socket.IO connection error:', error);
+      showToast('⚠️ WebSocket connection failed', 'error');
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket.IO disconnected:', reason);
+      updateStatus({ connected: false, reportCount: 0 });
     });
     
     socket.on('config', (data) => {
       config = data;
       renderMappings();
+      console.log('📝 Config loaded:', config);
     });
     
     socket.on('status', (data) => {
       updateStatus(data);
+      console.log('📊 Status update:', data);
     });
     
     socket.on('report', (report) => {
@@ -675,8 +709,9 @@
     }
     
     // Draw timeline chart showing input vs velocity over time
-    function drawTimeline() {
-      const canvas = document.getElementById('timelineCanvas');
+    // Draw timeline chart showing input vs velocity over time for JOG wheel
+    function drawJogTimeline() {
+      const canvas = document.getElementById('jogTimelineCanvas');
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
@@ -721,8 +756,8 @@
       
       // Clean old data
       const cutoffTime = now - TIMELINE_DURATION;
-      timelineData.inputs = timelineData.inputs.filter(d => d.time > cutoffTime);
-      timelineData.velocities = timelineData.velocities.filter(d => d.time > cutoffTime);
+      jogTimelineData.inputs = jogTimelineData.inputs.filter(d => d.time > cutoffTime);
+      jogTimelineData.velocities = jogTimelineData.velocities.filter(d => d.time > cutoffTime);
       
       // Helper to convert time to x position
       const timeToX = (time) => {
@@ -739,11 +774,11 @@
       };
       
       // Draw velocity line (smooth)
-      if (timelineData.velocities.length > 1) {
+      if (jogTimelineData.velocities.length > 1) {
         ctx.strokeStyle = '#667eea';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        timelineData.velocities.forEach((d, i) => {
+        jogTimelineData.velocities.forEach((d, i) => {
           const x = timeToX(d.time);
           const y = valueToY(d.value);
           if (i === 0) {
@@ -757,7 +792,7 @@
       
       // Draw input spikes (as bars)
       ctx.fillStyle = '#faad14';
-      timelineData.inputs.forEach(d => {
+      jogTimelineData.inputs.forEach(d => {
         const x = timeToX(d.time);
         const y = valueToY(d.value);
         const barWidth = 3;
@@ -767,39 +802,170 @@
       });
     }
     
-    // Update timeline with current data
-    function updateTimeline() {
+    // Draw timeline chart showing input vs velocity over time for SCROLL wheel
+    function drawScrollTimeline() {
+      const canvas = document.getElementById('scrollTimelineCanvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const padding = 30;
+      const centerY = height / 2;
       const now = Date.now();
       
-      // Add current velocities (for smooth line)
-      if (jogWheelData.velocity !== 0 || scrollWheelData.velocity !== 0) {
-        // Use whichever has velocity (or combine them)
-        const velocity = Math.abs(jogWheelData.velocity) > Math.abs(scrollWheelData.velocity) 
-          ? jogWheelData.velocity 
-          : scrollWheelData.velocity;
-        timelineData.velocities.push({ time: now, value: velocity });
-      } else if (timelineData.velocities.length > 0) {
+      // Clear canvas
+      ctx.clearRect(0, 0, width, height);
+      
+      // Draw center horizontal axis
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding, centerY);
+      ctx.lineTo(width - padding, centerY);
+      ctx.stroke();
+      
+      // Draw vertical axis
+      ctx.strokeStyle = '#ccc';
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.stroke();
+      
+      // Draw time grid lines (every 500ms)
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 6; i++) {
+        const x = padding + (i * (width - 2 * padding) / 6);
+        ctx.beginPath();
+        ctx.moveTo(x, padding);
+        ctx.lineTo(x, height - padding);
+        ctx.stroke();
+      }
+      
+      // Draw axis labels
+      ctx.fillStyle = '#666';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('-3s', padding - 5, height - padding + 15);
+      ctx.fillText('now', width - padding - 10, height - padding + 15);
+      
+      // Clean old data
+      const cutoffTime = now - TIMELINE_DURATION;
+      scrollTimelineData.inputs = scrollTimelineData.inputs.filter(d => d.time > cutoffTime);
+      scrollTimelineData.velocities = scrollTimelineData.velocities.filter(d => d.time > cutoffTime);
+      
+      // Helper to convert time to x position
+      const timeToX = (time) => {
+        const age = now - time;
+        const ratio = 1 - (age / TIMELINE_DURATION);
+        return padding + ratio * (width - 2 * padding);
+      };
+      
+      // Helper to convert value to y position
+      const valueToY = (value) => {
+        const maxValue = 100;
+        const ratio = Math.max(-1, Math.min(1, value / maxValue));
+        return centerY - ratio * (centerY - padding);
+      };
+      
+      // Draw velocity line (smooth)
+      if (scrollTimelineData.velocities.length > 1) {
+        ctx.strokeStyle = '#667eea';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        scrollTimelineData.velocities.forEach((d, i) => {
+          const x = timeToX(d.time);
+          const y = valueToY(d.value);
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+      }
+      
+      // Draw input spikes (as bars)
+      ctx.fillStyle = '#faad14';
+      scrollTimelineData.inputs.forEach(d => {
+        const x = timeToX(d.time);
+        const y = valueToY(d.value);
+        const barWidth = 3;
+        
+        // Draw bar from center to value
+        ctx.fillRect(x - barWidth/2, Math.min(centerY, y), barWidth, Math.abs(centerY - y));
+      });
+    }
+    
+    // Legacy function for backwards compatibility
+    function drawTimeline() {
+      drawJogTimeline();
+    }
+    
+    // Update jog timeline with current data
+    function updateJogTimeline() {
+      const now = Date.now();
+      
+      // Add current velocity (for smooth line)
+      if (jogWheelData.velocity !== 0) {
+        jogTimelineData.velocities.push({ time: now, value: jogWheelData.velocity });
+      } else if (jogTimelineData.velocities.length > 0) {
         // Add zero point when velocity stops
-        const lastVelocity = timelineData.velocities[timelineData.velocities.length - 1];
+        const lastVelocity = jogTimelineData.velocities[jogTimelineData.velocities.length - 1];
         if (lastVelocity.value !== 0) {
-          timelineData.velocities.push({ time: now, value: 0 });
+          jogTimelineData.velocities.push({ time: now, value: 0 });
         }
       }
       
       // Redraw
-      drawTimeline();
+      drawJogTimeline();
     }
     
-    // Record input event on timeline
-    function recordInputEvent(velocity, inputAmount) {
+    // Update scroll timeline with current data
+    function updateScrollTimeline() {
+      const now = Date.now();
+      
+      // Add current velocity (for smooth line)
+      if (scrollWheelData.velocity !== 0) {
+        scrollTimelineData.velocities.push({ time: now, value: scrollWheelData.velocity });
+      } else if (scrollTimelineData.velocities.length > 0) {
+        // Add zero point when velocity stops
+        const lastVelocity = scrollTimelineData.velocities[jogTimelineData.velocities.length - 1];
+        if (lastVelocity.value !== 0) {
+          scrollTimelineData.velocities.push({ time: now, value: 0 });
+        }
+      }
+      
+      // Redraw
+      drawScrollTimeline();
+    }
+    
+    // Legacy function for backwards compatibility
+    function updateTimeline() {
+      updateJogTimeline();
+      updateScrollTimeline();
+    }
+    
+    // Record input event on jog timeline
+    function recordJogInputEvent(velocity, inputAmount) {
       const now = Date.now();
       const signedInput = velocity >= 0 ? inputAmount : -inputAmount;
-      timelineData.inputs.push({ time: now, value: signedInput });
+      jogTimelineData.inputs.push({ time: now, value: signedInput });
     }
     
-    // Draw simple velocity vs input bars
-    function drawAccelerationCurve() {
-      const canvas = document.getElementById('curveCanvas');
+    // Record input event on scroll timeline
+    function recordScrollInputEvent(velocity, inputAmount) {
+      const now = Date.now();
+      const signedInput = velocity >= 0 ? inputAmount : -inputAmount;
+      scrollTimelineData.inputs.push({ time: now, value: signedInput });
+    }
+    
+    // Legacy function for backwards compatibility
+    function recordInputEvent(velocity, inputAmount) {
+      recordJogInputEvent(velocity, inputAmount);
+    }
+    
+    // Draw simple velocity vs input bars for JOG wheel
+    function drawJogCurve() {
+      const canvas = document.getElementById('jogCurveCanvas');
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
@@ -836,33 +1002,30 @@
       }
       
       // Check if we should still show the input or fade it
-      const timeSinceInput = now - inputDisplayData.lastInputTime;
+      const timeSinceInput = now - jogInputDisplayData.lastInputTime;
       let inputValue = 0;
       
-      if (timeSinceInput < inputDisplayData.holdDuration) {
-        // Show full input value during hold period
-        inputValue = inputDisplayData.value;
+      if (timeSinceInput < jogInputDisplayData.holdDuration) {
+        inputValue = jogInputDisplayData.value;
       } else {
-        // Input has expired
         inputValue = 0;
       }
       
       // Get velocity with smooth interpolation
-      if (!window.smoothDisplayVelocity) window.smoothDisplayVelocity = 0;
-      const targetVelocity = window.currentDisplayVelocity || 0;
+      if (!window.jogSmoothDisplayVelocity) window.jogSmoothDisplayVelocity = 0;
+      const targetVelocity = window.jogCurrentDisplayVelocity || 0;
       
-      // Smooth interpolation for velocity only
       const smoothFactor = 0.2;
-      window.smoothDisplayVelocity += (targetVelocity - window.smoothDisplayVelocity) * smoothFactor;
+      window.jogSmoothDisplayVelocity += (targetVelocity - window.jogSmoothDisplayVelocity) * smoothFactor;
       
-      const velocityValue = window.smoothDisplayVelocity;
+      const velocityValue = window.jogSmoothDisplayVelocity;
       
       // Update multiplier text if we have values
       if (Math.abs(inputValue) > 1 && Math.abs(velocityValue) > 1) {
         const multiplier = Math.abs(velocityValue) / Math.max(Math.abs(inputValue), 1);
-        document.getElementById('effectiveness').textContent = multiplier.toFixed(1) + 'x';
+        document.getElementById('jogEffectiveness').textContent = multiplier.toFixed(1) + 'x';
       } else if (Math.abs(velocityValue) < 1) {
-        document.getElementById('effectiveness').textContent = '—';
+        document.getElementById('jogEffectiveness').textContent = '—';
       }
       
       // Helper to draw a bar
@@ -872,50 +1035,41 @@
         const barHeight = (Math.abs(clampedValue) / maxValue) * (centerY - padding - 10);
         const barY = clampedValue >= 0 ? centerY - barHeight : centerY;
         
-        // Draw bar
         ctx.fillStyle = color;
         ctx.fillRect(x - barWidth/2, barY, barWidth, Math.abs(barHeight));
         
-        // Draw outline
         ctx.strokeStyle = color;
         ctx.lineWidth = 2;
         ctx.strokeRect(x - barWidth/2, barY, barWidth, Math.abs(barHeight));
         
-        // Draw label
         ctx.fillStyle = '#333';
         ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(label, x, height - padding + 20);
         
-        // Draw value
         ctx.fillStyle = color;
         ctx.font = 'bold 14px sans-serif';
         const valueY = clampedValue >= 0 ? barY - 5 : barY + Math.abs(barHeight) + 15;
         ctx.fillText(Math.round(value).toString(), x, valueY);
       };
       
-      // Draw input bar (left)
       const inputX = width / 2 - spacing / 2;
       drawBar(inputX, inputValue, '#faad14', 'Input');
       
-      // Draw velocity bar (right)
       const velocityX = width / 2 + spacing / 2;
       drawBar(velocityX, velocityValue, '#667eea', 'Velocity');
       
-      // Draw arrow between them if there's a difference
       if (Math.abs(inputValue) > 1 || Math.abs(velocityValue) > 1) {
         const arrowY = centerY + (centerY - padding) / 2 + 20;
         ctx.strokeStyle = '#52c41a';
         ctx.fillStyle = '#52c41a';
         ctx.lineWidth = 2;
         
-        // Arrow line
         ctx.beginPath();
         ctx.moveTo(inputX + barWidth/2 + 5, arrowY);
         ctx.lineTo(velocityX - barWidth/2 - 10, arrowY);
         ctx.stroke();
         
-        // Arrow head
         ctx.beginPath();
         ctx.moveTo(velocityX - barWidth/2 - 10, arrowY);
         ctx.lineTo(velocityX - barWidth/2 - 18, arrowY - 4);
@@ -924,123 +1078,208 @@
         ctx.fill();
       }
       
-      // Continue animation if velocity is changing or input is still being held
-      if (Math.abs(window.smoothDisplayVelocity - targetVelocity) > 0.5 || timeSinceInput < inputDisplayData.holdDuration) {
-        requestAnimationFrame(drawAccelerationCurve);
+      if (Math.abs(window.jogSmoothDisplayVelocity - targetVelocity) > 0.5 || timeSinceInput < jogInputDisplayData.holdDuration) {
+        requestAnimationFrame(drawJogCurve);
       }
     }
     
-    // Update curve visualization with current values
-    function updateCurveVisualization(inputSpeed, velocity) {
+    // Draw simple velocity vs input bars for SCROLL wheel
+    function drawScrollCurve() {
+      const canvas = document.getElementById('scrollCurveCanvas');
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      const padding = 40;
+      const centerY = height / 2;
+      const barWidth = 50;
+      const spacing = 100;
+      const now = Date.now();
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, width, height);
+      
+      // Draw center line
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(padding, centerY);
+      ctx.lineTo(width - padding, centerY);
+      ctx.stroke();
+      
+      // Draw scale marks
+      ctx.strokeStyle = '#ddd';
+      ctx.lineWidth = 1;
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = '#999';
+      for (let i = -100; i <= 100; i += 50) {
+        if (i === 0) continue;
+        const y = centerY - (i / 100) * (centerY - padding);
+        ctx.beginPath();
+        ctx.moveTo(padding - 5, y);
+        ctx.lineTo(width - padding, y);
+        ctx.stroke();
+        ctx.fillText(i > 0 ? `+${i}` : i.toString(), 5, y + 3);
+      }
+      
+      // Check if we should still show the input or fade it
+      const timeSinceInput = now - scrollInputDisplayData.lastInputTime;
+      let inputValue = 0;
+      
+      if (timeSinceInput < scrollInputDisplayData.holdDuration) {
+        inputValue = scrollInputDisplayData.value;
+      } else {
+        inputValue = 0;
+      }
+      
+      // Get velocity with smooth interpolation
+      if (!window.scrollSmoothDisplayVelocity) window.scrollSmoothDisplayVelocity = 0;
+      const targetVelocity = window.scrollCurrentDisplayVelocity || 0;
+      
+      const smoothFactor = 0.2;
+      window.scrollSmoothDisplayVelocity += (targetVelocity - window.scrollSmoothDisplayVelocity) * smoothFactor;
+      
+      const velocityValue = window.scrollSmoothDisplayVelocity;
+      
+      // Update multiplier text if we have values
+      if (Math.abs(inputValue) > 1 && Math.abs(velocityValue) > 1) {
+        const multiplier = Math.abs(velocityValue) / Math.max(Math.abs(inputValue), 1);
+        document.getElementById('scrollEffectiveness').textContent = multiplier.toFixed(1) + 'x';
+      } else if (Math.abs(velocityValue) < 1) {
+        document.getElementById('scrollEffectiveness').textContent = '—';
+      }
+      
+      // Helper to draw a bar
+      const drawBar = (x, value, color, label) => {
+        const maxValue = 100;
+        const clampedValue = Math.max(-maxValue, Math.min(maxValue, value));
+        const barHeight = (Math.abs(clampedValue) / maxValue) * (centerY - padding - 10);
+        const barY = clampedValue >= 0 ? centerY - barHeight : centerY;
+        
+        ctx.fillStyle = color;
+        ctx.fillRect(x - barWidth/2, barY, barWidth, Math.abs(barHeight));
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - barWidth/2, barY, barWidth, Math.abs(barHeight));
+        
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, x, height - padding + 20);
+        
+        ctx.fillStyle = color;
+        ctx.font = 'bold 14px sans-serif';
+        const valueY = clampedValue >= 0 ? barY - 5 : barY + Math.abs(barHeight) + 15;
+        ctx.fillText(Math.round(value).toString(), x, valueY);
+      };
+      
+      const inputX = width / 2 - spacing / 2;
+      drawBar(inputX, inputValue, '#faad14', 'Input');
+      
+      const velocityX = width / 2 + spacing / 2;
+      drawBar(velocityX, velocityValue, '#667eea', 'Velocity');
+      
+      if (Math.abs(inputValue) > 1 || Math.abs(velocityValue) > 1) {
+        const arrowY = centerY + (centerY - padding) / 2 + 20;
+        ctx.strokeStyle = '#52c41a';
+        ctx.fillStyle = '#52c41a';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.moveTo(inputX + barWidth/2 + 5, arrowY);
+        ctx.lineTo(velocityX - barWidth/2 - 10, arrowY);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(velocityX - barWidth/2 - 10, arrowY);
+        ctx.lineTo(velocityX - barWidth/2 - 18, arrowY - 4);
+        ctx.lineTo(velocityX - barWidth/2 - 18, arrowY + 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      if (Math.abs(window.scrollSmoothDisplayVelocity - targetVelocity) > 0.5 || timeSinceInput < scrollInputDisplayData.holdDuration) {
+        requestAnimationFrame(drawScrollCurve);
+      }
+    }
+    
+    // Draw simple velocity vs input bars (legacy function - redirects to jog)
+    function drawAccelerationCurve() {
+      drawJogCurve();
+    }
+    
+    // Update jog curve visualization with current values
+    function updateJogCurveVisualization(inputSpeed, velocity) {
       // Store input value with timestamp for display hold
-      inputDisplayData.value = inputSpeed;
-      inputDisplayData.lastInputTime = Date.now();
+      jogInputDisplayData.value = inputSpeed;
+      jogInputDisplayData.lastInputTime = Date.now();
       
       // Store velocity for smooth rendering
-      window.currentDisplayVelocity = velocity;
+      window.jogCurrentDisplayVelocity = velocity;
       
       // Update text displays (show absolute values)
-      document.getElementById('currentInput').textContent = Math.round(Math.abs(inputSpeed));
-      document.getElementById('currentVelocity').textContent = Math.round(Math.abs(velocity));
+      document.getElementById('jogCurrentInput').textContent = Math.round(Math.abs(inputSpeed));
+      document.getElementById('jogCurrentVelocity').textContent = Math.round(Math.abs(velocity));
       
       // Calculate and display multiplier
       if (Math.abs(inputSpeed) < 1 && Math.abs(velocity) < 1) {
-        document.getElementById('effectiveness').textContent = '—';
+        document.getElementById('jogEffectiveness').textContent = '—';
       } else {
         const multiplier = Math.abs(velocity) / Math.max(Math.abs(inputSpeed), 1);
-        document.getElementById('effectiveness').textContent = multiplier.toFixed(1) + 'x';
+        document.getElementById('jogEffectiveness').textContent = multiplier.toFixed(1) + 'x';
       }
       
       // Trigger smooth animation
-      drawAccelerationCurve();
+      drawJogCurve();
+    }
+    
+    // Update scroll curve visualization with current values
+    function updateScrollCurveVisualization(inputSpeed, velocity) {
+      // Store input value with timestamp for display hold
+      scrollInputDisplayData.value = inputSpeed;
+      scrollInputDisplayData.lastInputTime = Date.now();
+      
+      // Store velocity for smooth rendering
+      window.scrollCurrentDisplayVelocity = velocity;
+      
+      // Update text displays (show absolute values)
+      document.getElementById('scrollCurrentInput').textContent = Math.round(Math.abs(inputSpeed));
+      document.getElementById('scrollCurrentVelocity').textContent = Math.round(Math.abs(velocity));
+      
+      // Calculate and display multiplier
+      if (Math.abs(inputSpeed) < 1 && Math.abs(velocity) < 1) {
+        document.getElementById('scrollEffectiveness').textContent = '—';
+      } else {
+        const multiplier = Math.abs(velocity) / Math.max(Math.abs(inputSpeed), 1);
+        document.getElementById('scrollEffectiveness').textContent = multiplier.toFixed(1) + 'x';
+      }
+      
+      // Trigger smooth animation
+      drawScrollCurve();
+    }
+    
+    // Legacy function - redirects to jog
+    function updateCurveVisualization(inputSpeed, velocity) {
+      updateJogCurveVisualization(inputSpeed, velocity);
     }
     
     // Initialize curve visualization on load
     window.addEventListener('load', () => {
-      renderEasingPicker();
-      drawAccelerationCurve();
-      drawTimeline();
-      // Start timeline update loop
-      setInterval(updateTimeline, 50); // Update 20 times per second
+      drawJogCurve();
+      drawScrollCurve();
+      drawJogTimeline();
+      drawScrollTimeline();
+      // Start timeline update loops
+      setInterval(updateJogTimeline, 50); // Update 20 times per second
+      setInterval(updateScrollTimeline, 50);
     });
     
-    // Render easing function picker with visual previews
-    function renderEasingPicker() {
-      const container = document.getElementById('easingPicker');
-      container.innerHTML = '';
-      
-      easingMetadata.forEach(easing => {
-        const button = document.createElement('div');
-        button.style.cssText = `
-          cursor: pointer;
-          padding: 8px;
-          border: 2px solid ${easing.id === currentEasingFunction ? '#667eea' : '#ddd'};
-          border-radius: 8px;
-          background: ${easing.id === currentEasingFunction ? '#f0f2ff' : 'white'};
-          transition: all 0.2s;
-          text-align: center;
-        `;
-        
-        // Create mini canvas for curve preview
-        const canvas = document.createElement('canvas');
-        canvas.width = 60;
-        canvas.height = 40;
-        canvas.style.cssText = 'display: block; margin: 0 auto 4px;';
-        
-        // Draw preview curve
-        const ctx = canvas.getContext('2d');
-        ctx.strokeStyle = easing.id === currentEasingFunction ? '#667eea' : '#999';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        const easingFunc = easingFunctions[easing.id];
-        for (let x = 0; x <= 60; x++) {
-          const ratio = x / 60;
-          const y = 40 - easingFunc(ratio) * 35;
-          if (x === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        }
-        ctx.stroke();
-        
-        // Add label
-        const label = document.createElement('div');
-        label.textContent = easing.name;
-        label.style.cssText = `
-          font-size: 10px;
-          font-weight: ${easing.id === currentEasingFunction ? 'bold' : 'normal'};
-          color: ${easing.id === currentEasingFunction ? '#667eea' : '#666'};
-        `;
-        
-        button.appendChild(canvas);
-        button.appendChild(label);
-        
-        // Click handler
-        button.onclick = () => {
-          currentEasingFunction = easing.id;
-          renderEasingPicker();
-          drawAccelerationCurve();
-          showToast(`📈 Switched to ${easing.name}`);
-        };
-        
-        // Hover effect
-        button.onmouseenter = () => {
-          if (easing.id !== currentEasingFunction) {
-            button.style.borderColor = '#667eea';
-            button.style.background = '#fafbff';
-          }
-        };
-        button.onmouseleave = () => {
-          if (easing.id !== currentEasingFunction) {
-            button.style.borderColor = '#ddd';
-            button.style.background = 'white';
-          }
-        };
-        
-        container.appendChild(button);
-      });
+    // Update global friction
+    function updateFriction(value) {
+      globalFriction = parseInt(value);
+      // Rescale display: slider 5-100 maps to display 1-100
+      const displayValue = Math.round(((value - 5) / 95) * 99 + 1);
+      document.getElementById('frictionValue').textContent = displayValue;
     }
     
     // Update jog wheel visualization
@@ -1055,17 +1294,17 @@
       const targetVelocity = inputSpeed * TARGET_MULTIPLIER * direction;
       
       // Record input event for timeline
-      recordInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
+      recordJogInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
       
-      // Calculate acceleration effectiveness using easing curve
-      const ratio = Math.abs(inputSpeed) / Math.max(Math.abs(jogWheelData.velocity), 1);
-      const normalizedRatio = Math.min(ratio, 3) / 3; // Normalize to 0-1 range (cap at 3x)
-      const easingFunc = easingFunctions[currentEasingFunction];
-      const effectiveness = easingFunc(normalizedRatio);
+      // Calculate acceleration with friction
+      // Lower friction (5-49) = faster acceleration and slower deceleration (more momentum)
+      // Higher friction (51-100) = slower acceleration and faster deceleration (more resistance)
+      const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to 0.1 to prevent division issues
+      const accelerationRate = Math.min(0.5, 0.2 / frictionFactor); // Cap max acceleration rate
       
-      // Apply acceleration toward target, scaled by effectiveness
+      // Apply acceleration toward target
       const velocityDiff = targetVelocity - jogWheelData.velocity;
-      jogWheelData.velocity += velocityDiff * ACCELERATION_RATE * effectiveness;
+      jogWheelData.velocity += velocityDiff * accelerationRate;
       
       // Update stats
       jogWheelData.totalScrolls++;
@@ -1099,7 +1338,7 @@
       document.getElementById('jogSpeed').style.color = speedColor;
       
       // Update curve visualization with signed input
-      updateCurveVisualization(signedInput * TARGET_MULTIPLIER, jogWheelData.velocity);
+      updateJogCurveVisualization(signedInput * TARGET_MULTIPLIER, jogWheelData.velocity);
       
       // Start physics animation if not already running
       if (!jogWheelData.animationFrame) {
@@ -1136,6 +1375,41 @@
       showToast('🔄 Jog wheel position reset');
     }
     
+    function resetScrollPosition() {
+      if (scrollWheelData.debounceTimer) {
+        clearTimeout(scrollWheelData.debounceTimer);
+      }
+      if (scrollWheelData.animationFrame) {
+        cancelAnimationFrame(scrollWheelData.animationFrame);
+      }
+      scrollWheelData = {
+        position: 0,
+        totalScrolls: 0,
+        lastDirection: null,
+        highestSpeed: 0,
+        currentSeriesHighest: 0,
+        debounceTimer: null,
+        velocity: 0,
+        lastInputTime: 0,
+        animationFrame: null
+      };
+      document.getElementById('scrollPosition').textContent = '0';
+      document.getElementById('scrollProgress').style.strokeDashoffset = '502.65';
+      document.getElementById('scrollScrolls').textContent = '0';
+      document.getElementById('scrollDirection').textContent = '—';
+      document.getElementById('scrollDirection').style.color = '#333';
+      document.getElementById('scrollSpeed').textContent = '—';
+      document.getElementById('scrollSpeed').style.color = '#333';
+      document.getElementById('scrollHighestSpeed').textContent = '0';
+      showToast('🔄 Scroll wheel position reset');
+    }
+    
+    // Update global sensitivity
+    function updateSensitivity(value) {
+      globalSensitivity = parseInt(value);
+      document.getElementById('sensitivityValue').textContent = value;
+    }
+    
     // Update scroll wheel visualization
     function updateScrollWheel(event) {
       // Record input time
@@ -1148,17 +1422,17 @@
       const targetVelocity = inputSpeed * TARGET_MULTIPLIER * direction;
       
       // Record input event for timeline
-      recordInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
+      recordScrollInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
       
-      // Calculate acceleration effectiveness using easing curve
-      const ratio = Math.abs(inputSpeed) / Math.max(Math.abs(scrollWheelData.velocity), 1);
-      const normalizedRatio = Math.min(ratio, 3) / 3; // Normalize to 0-1 range (cap at 3x)
-      const easingFunc = easingFunctions[currentEasingFunction];
-      const effectiveness = easingFunc(normalizedRatio);
+      // Calculate acceleration with friction
+      // Lower friction (5-49) = faster acceleration and slower deceleration (more momentum)
+      // Higher friction (51-100) = slower acceleration and faster deceleration (more resistance)
+      const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to 0.1 to prevent division issues
+      const accelerationRate = Math.min(0.5, 0.2 / frictionFactor); // Cap max acceleration rate
       
-      // Apply acceleration toward target, scaled by effectiveness
+      // Apply acceleration toward target
       const velocityDiff = targetVelocity - scrollWheelData.velocity;
-      scrollWheelData.velocity += velocityDiff * ACCELERATION_RATE * effectiveness;
+      scrollWheelData.velocity += velocityDiff * accelerationRate;
       
       // Update stats
       scrollWheelData.totalScrolls++;
@@ -1191,64 +1465,55 @@
       const speedColor = event.amount > 50 ? '#ff4d4f' : event.amount > 20 ? '#faad14' : '#52c41a';
       document.getElementById('scrollSpeed').style.color = speedColor;
       
+      // Update curve visualization with signed input
+      updateScrollCurveVisualization(signedInput * TARGET_MULTIPLIER, scrollWheelData.velocity);
+      
       // Start physics animation if not already running
       if (!scrollWheelData.animationFrame) {
         scrollWheelData.animationFrame = requestAnimationFrame(animateScrollWheel);
       }
     }
     
-    function resetScrollPosition() {
-      if (scrollWheelData.debounceTimer) {
-        clearTimeout(scrollWheelData.debounceTimer);
-      }
-      if (scrollWheelData.animationFrame) {
-        cancelAnimationFrame(scrollWheelData.animationFrame);
-      }
-      scrollWheelData = {
-        position: 0,
-        totalScrolls: 0,
-        lastDirection: null,
-        highestSpeed: 0,
-        currentSeriesHighest: 0,
-        debounceTimer: null,
-        velocity: 0,
-        lastInputTime: 0,
-        animationFrame: null
-      };
-      document.getElementById('scrollPosition').textContent = '0';
-      document.getElementById('scrollProgress').style.height = '50%';
-      document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #52c41a, #91d5ff)';
-      document.getElementById('scrollScrolls').textContent = '0';
-      document.getElementById('scrollDirection').textContent = '—';
-      document.getElementById('scrollDirection').style.color = '#333';
-      document.getElementById('scrollSpeed').textContent = '—';
-      document.getElementById('scrollSpeed').style.color = '#333';
-      document.getElementById('scrollHighestSpeed').textContent = '0';
-      showToast('🔄 Scroll wheel position reset');
-    }
     
     // Physics animation loop for jog wheel
     function animateJogWheel() {
       const now = Date.now();
       const timeSinceInput = now - jogWheelData.lastInputTime;
       
-      // Apply friction if no recent input
-      if (timeSinceInput > 50) {
-        jogWheelData.velocity *= FRICTION;
-      }
-      
       // Stop if velocity is too small
       if (Math.abs(jogWheelData.velocity) < VELOCITY_THRESHOLD) {
         jogWheelData.velocity = 0;
         jogWheelData.animationFrame = null;
         // Update only velocity, not input
-        window.currentDisplayVelocity = 0;
-        drawAccelerationCurve();
+        window.jogCurrentDisplayVelocity = 0;
+        drawJogCurve();
         return;
       }
       
-      // Update position based on velocity
-      jogWheelData.position += jogWheelData.velocity;
+      // Apply friction if no recent input
+      if (timeSinceInput > 50) {
+        // Apply friction-based exponential decay
+        // Lower friction (5-49) = slower decay (more momentum/coasting)
+        // Higher friction (51-100) = faster decay (quicker stop)
+        const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to prevent issues
+        const baseDecayRate = 0.92; // Base decay at friction = 50
+        // Scale decay rate: lower friction = closer to 1 (slower decay), higher friction = further from 1 (faster decay)
+        const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor))); // Clamp between 0.8 and 0.99
+        jogWheelData.velocity *= decayRate;
+        
+        // Check again if velocity dropped below threshold after friction
+        if (Math.abs(jogWheelData.velocity) < VELOCITY_THRESHOLD) {
+          jogWheelData.velocity = 0;
+          jogWheelData.animationFrame = null;
+          window.jogCurrentDisplayVelocity = 0;
+          drawJogCurve();
+          return;
+        }
+      }
+      
+      // Update position based on velocity with sensitivity scaling
+      const scaledVelocity = jogWheelData.velocity * (globalSensitivity / 50); // 50 is baseline (1x)
+      jogWheelData.position += scaledVelocity;
       
       // Update UI
       document.getElementById('jogPosition').textContent = Math.round(jogWheelData.position);
@@ -1260,9 +1525,9 @@
       document.getElementById('jogProgress').style.strokeDashoffset = offset;
       
       // Update only velocity display, not input
-      window.currentDisplayVelocity = jogWheelData.velocity;
-      document.getElementById('currentVelocity').textContent = Math.round(Math.abs(jogWheelData.velocity));
-      drawAccelerationCurve();
+      window.jogCurrentDisplayVelocity = jogWheelData.velocity;
+      document.getElementById('jogCurrentVelocity').textContent = Math.round(Math.abs(jogWheelData.velocity));
+      drawJogCurve();
       
       // Continue animation
       jogWheelData.animationFrame = requestAnimationFrame(animateJogWheel);
@@ -1273,11 +1538,6 @@
       const now = Date.now();
       const timeSinceInput = now - scrollWheelData.lastInputTime;
       
-      // Apply friction if no recent input
-      if (timeSinceInput > 50) {
-        scrollWheelData.velocity *= FRICTION;
-      }
-      
       // Stop if velocity is too small
       if (Math.abs(scrollWheelData.velocity) < VELOCITY_THRESHOLD) {
         scrollWheelData.velocity = 0;
@@ -1285,24 +1545,42 @@
         return;
       }
       
-      // Update position based on velocity
-      scrollWheelData.position += scrollWheelData.velocity;
+      // Apply friction if no recent input
+      if (timeSinceInput > 50) {
+        // Apply friction-based exponential decay
+        // Lower friction (5-49) = slower decay (more momentum/coasting)
+        // Higher friction (51-100) = faster decay (quicker stop)
+        const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to prevent issues
+        const baseDecayRate = 0.92; // Base decay at friction = 50
+        // Scale decay rate: lower friction = closer to 1 (slower decay), higher friction = further from 1 (faster decay)
+        const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor))); // Clamp between 0.8 and 0.99
+        scrollWheelData.velocity *= decayRate;
+        
+        // Check again if velocity dropped below threshold after friction
+        if (Math.abs(scrollWheelData.velocity) < VELOCITY_THRESHOLD) {
+          scrollWheelData.velocity = 0;
+          scrollWheelData.animationFrame = null;
+          return;
+        }
+      }
+      
+      // Update position based on velocity with sensitivity scaling
+      const scaledVelocity = scrollWheelData.velocity * (globalSensitivity / 50); // 50 is baseline (1x)
+      scrollWheelData.position += scaledVelocity;
       
       // Update UI
       document.getElementById('scrollPosition').textContent = Math.round(scrollWheelData.position);
       
-      // Update vertical bar
-      const maxVisualRange = 500;
-      const normalizedPos = Math.max(-maxVisualRange, Math.min(maxVisualRange, scrollWheelData.position));
-      const percentage = ((normalizedPos / maxVisualRange) * 50) + 50;
-      document.getElementById('scrollProgress').style.height = percentage + '%';
+      // Update only velocity display, not input
+      window.scrollCurrentDisplayVelocity = scrollWheelData.velocity;
+      document.getElementById('scrollCurrentVelocity').textContent = Math.round(Math.abs(scrollWheelData.velocity));
+      drawScrollCurve();
       
-      // Update color
-      if (scrollWheelData.position > 0) {
-        document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #52c41a, #91d5ff)';
-      } else {
-        document.getElementById('scrollProgress').style.background = 'linear-gradient(to top, #ff4d4f, #ffa39e)';
-      }
+      // Update progress circle
+      const normalizedPos = ((scrollWheelData.position % 360) + 360) % 360;
+      const circumference = 502.65;
+      const offset = circumference - (normalizedPos / 360) * circumference;
+      document.getElementById('scrollProgress').style.strokeDashoffset = offset;
       
       // Continue animation
       scrollWheelData.animationFrame = requestAnimationFrame(animateScrollWheel);

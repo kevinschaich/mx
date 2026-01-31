@@ -115,6 +115,8 @@ reader.on('config-updated', (newConfig) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
   console.log(`📊 Ready to connect to MX Dialpad`);
+  console.log(`💡 NOTE: Only one program can connect to the device at a time`);
+  console.log(`   If the CLI (npm run cli) is running, stop it first!`);
   
   // Auto-connect to the first available device
   const devices = HIDReader.findMXDialpad();
@@ -122,7 +124,10 @@ server.listen(PORT, '127.0.0.1', () => {
     // Connect to the vendor-specific interface (Usage Page 0xff43)
     const targetDevice = devices.find(d => d.usagePage === 0xff43) || devices[0];
     console.log(`🔌 Auto-connecting to: ${targetDevice.product} (Usage Page: 0x${targetDevice.usagePage.toString(16)})`);
-    reader.connect(targetDevice.path);
+    const success = reader.connect(targetDevice.path);
+    if (!success) {
+      console.log(`⚠️  Connection failed - device may be in use by another program (check if CLI is running)`);
+    }
   }
 });
 
