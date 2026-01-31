@@ -392,19 +392,10 @@
       <div class="card">
         <h2>Velocity & Input</h2>
         <div style="margin-bottom: 16px;">
-          <label for="easingSelect" style="display: block; margin-bottom: 8px; font-weight: 500;">Easing Function:</label>
-          <select id="easingSelect" onchange="updateEasingFunction()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
-            <option value="linear">Linear</option>
-            <option value="easeInQuad">Ease In Quad</option>
-            <option value="easeOutQuad" selected>Ease Out Quad (Default)</option>
-            <option value="easeInOutQuad">Ease In-Out Quad</option>
-            <option value="easeInCubic">Ease In Cubic</option>
-            <option value="easeOutCubic">Ease Out Cubic</option>
-            <option value="easeInOutCubic">Ease In-Out Cubic</option>
-            <option value="easeInExpo">Ease In Exponential</option>
-            <option value="easeOutExpo">Ease Out Exponential</option>
-            <option value="easeInOutExpo">Ease In-Out Exponential</option>
-          </select>
+          <label style="display: block; margin-bottom: 8px; font-weight: 500;">Easing Function:</label>
+          <div id="easingPicker" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px;">
+            <!-- Easing function previews will be inserted here -->
+          </div>
         </div>
         <div style="text-align: center; background: #f9f9f9; padding: 16px; border-radius: 8px;">
           <canvas id="curveCanvas" width="300" height="200" style="border: 1px solid #ddd; border-radius: 4px; background: white;"></canvas>
@@ -514,6 +505,20 @@
     
     // Current easing function
     let currentEasingFunction = 'easeOutQuad';
+    
+    // Easing function metadata
+    const easingMetadata = [
+      { id: 'linear', name: 'Linear' },
+      { id: 'easeInQuad', name: 'Ease In' },
+      { id: 'easeOutQuad', name: 'Ease Out' },
+      { id: 'easeInOutQuad', name: 'In-Out' },
+      { id: 'easeInCubic', name: 'Cubic In' },
+      { id: 'easeOutCubic', name: 'Cubic Out' },
+      { id: 'easeInOutCubic', name: 'Cubic In-Out' },
+      { id: 'easeInExpo', name: 'Expo In' },
+      { id: 'easeOutExpo', name: 'Expo Out' },
+      { id: 'easeInOutExpo', name: 'Expo In-Out' }
+    ];
     
     // Easing functions for acceleration curves
     const easingFunctions = {
@@ -667,13 +672,6 @@
         renderMappings();
         showToast('🗑️ All mappings cleared (save to persist)');
       }
-    }
-    
-    // Update easing function and redraw curve
-    function updateEasingFunction() {
-      currentEasingFunction = document.getElementById('easingSelect').value;
-      drawAccelerationCurve();
-      showToast(`📈 Switched to ${currentEasingFunction}`);
     }
     
     // Draw timeline chart showing input vs velocity over time
@@ -959,11 +957,91 @@
     
     // Initialize curve visualization on load
     window.addEventListener('load', () => {
+      renderEasingPicker();
       drawAccelerationCurve();
       drawTimeline();
       // Start timeline update loop
       setInterval(updateTimeline, 50); // Update 20 times per second
     });
+    
+    // Render easing function picker with visual previews
+    function renderEasingPicker() {
+      const container = document.getElementById('easingPicker');
+      container.innerHTML = '';
+      
+      easingMetadata.forEach(easing => {
+        const button = document.createElement('div');
+        button.style.cssText = `
+          cursor: pointer;
+          padding: 8px;
+          border: 2px solid ${easing.id === currentEasingFunction ? '#667eea' : '#ddd'};
+          border-radius: 8px;
+          background: ${easing.id === currentEasingFunction ? '#f0f2ff' : 'white'};
+          transition: all 0.2s;
+          text-align: center;
+        `;
+        
+        // Create mini canvas for curve preview
+        const canvas = document.createElement('canvas');
+        canvas.width = 60;
+        canvas.height = 40;
+        canvas.style.cssText = 'display: block; margin: 0 auto 4px;';
+        
+        // Draw preview curve
+        const ctx = canvas.getContext('2d');
+        ctx.strokeStyle = easing.id === currentEasingFunction ? '#667eea' : '#999';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        const easingFunc = easingFunctions[easing.id];
+        for (let x = 0; x <= 60; x++) {
+          const ratio = x / 60;
+          const y = 40 - easingFunc(ratio) * 35;
+          if (x === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+        
+        // Add label
+        const label = document.createElement('div');
+        label.textContent = easing.name;
+        label.style.cssText = `
+          font-size: 10px;
+          font-weight: ${easing.id === currentEasingFunction ? 'bold' : 'normal'};
+          color: ${easing.id === currentEasingFunction ? '#667eea' : '#666'};
+        `;
+        
+        button.appendChild(canvas);
+        button.appendChild(label);
+        
+        // Click handler
+        button.onclick = () => {
+          currentEasingFunction = easing.id;
+          renderEasingPicker();
+          drawAccelerationCurve();
+          showToast(`📈 Switched to ${easing.name}`);
+        };
+        
+        // Hover effect
+        button.onmouseenter = () => {
+          if (easing.id !== currentEasingFunction) {
+            button.style.borderColor = '#667eea';
+            button.style.background = '#fafbff';
+          }
+        };
+        button.onmouseleave = () => {
+          if (easing.id !== currentEasingFunction) {
+            button.style.borderColor = '#ddd';
+            button.style.background = 'white';
+          }
+        };
+        
+        container.appendChild(button);
+      });
+    }
     
     // Update jog wheel visualization
     function updateJogWheel(event) {
