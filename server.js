@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { HIDReader } from './lib/hid-reader.js';
+import { keyboard, Key } from '@nut-tree-fork/nut-js';
 
 const app = express();
 const server = createServer(app);
@@ -22,6 +23,107 @@ if (existsSync(CONFIG_FILE)) {
 }
 
 const reader = new HIDReader(config);
+
+// Physics state for Jog wheel (matching HTML logic exactly)
+const jogState = {
+  position: 0,
+  velocity: 0,
+  lastInputTime: 0,
+  animationInterval: null,
+  lastKeyPosition: 0
+};
+
+// Physics constants (matching HTML)
+const VELOCITY_THRESHOLD = 0.1;
+const TARGET_MULTIPLIER = 2.5;
+let globalFriction = 50;
+let globalSensitivity = 50;
+const KEY_THRESHOLD = 10; // Send key every 10 position units
+
+// Optimize keyboard for speed - set config once
+keyboard.config.autoDelayMs = 0; // No delay between press/release
+
+// Non-blocking keyboard queue to prevent blocking the physics loop
+const keyQueue = [];
+let isProcessingKeys = false;
+
+async function processKeyQueue() {
+  if (isProcessingKeys || keyQueue.length === 0) return;
+  
+  isProcessingKeys = true;
+  while (keyQueue.length > 0) {
+    const key = keyQueue.shift();
+    try {
+      await keyboard.type(key);
+    } catch (err) {
+      console.error('Key error:', err.message);
+    }
+  }
+  isProcessingKeys = false;
+}
+
+// Physics tick function (matching HTML animateJogWheel)
+function jogPhysicsTick() {
+  const now = Date.now();
+  const timeSinceInput = now - jogState.lastInputTime;
+  
+  // Stop if velocity is too small
+  if (Math.abs(jogState.velocity) < VELOCITY_THRESHOLD) {
+    jogState.velocity = 0;
+    if (jogState.animationInterval) {
+      clearInterval(jogState.animationInterval);
+      jogState.animationInterval = null;
+    }
+    return;
+  }
+  
+  // Apply friction if no recent input
+  if (timeSinceInput > 50) {
+    const frictionFactor = Math.max(0.1, globalFriction / 50);
+    const baseDecayRate = 0.92;
+    const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor)));
+    jogState.velocity *= decayRate;
+    
+    // Check again if velocity dropped below threshold
+    if (Math.abs(jogState.velocity) < VELOCITY_THRESHOLD) {
+      jogState.velocity = 0;
+      if (jogState.animationInterval) {
+        clearInterval(jogState.animationInterval);
+        jogState.animationInterval = null;
+      }
+      return;
+    }
+  }
+  
+  // Update position based on velocity with sensitivity scaling
+  const scaledVelocity = jogState.velocity * (globalSensitivity / 50);
+  jogState.position += scaledVelocity;
+  
+  // Send keyboard events based on position changes (non-blocking)
+  const positionDelta = jogState.position - jogState.lastKeyPosition;
+  if (Math.abs(positionDelta) >= KEY_THRESHOLD) {
+    const numKeys = Math.floor(Math.abs(positionDelta) / KEY_THRESHOLD);
+    const direction = positionDelta > 0 ? 'right' : 'left';
+    const key = direction === 'right' ? Key.Right : Key.Left;
+    const symbol = direction === 'right' ? '→' : '←';
+    
+    // Queue keys instead of sending synchronously
+    for (let i = 0; i < numKeys; i++) {
+      keyQueue.push(key);
+      console.log(`⌨️  ${symbol}`);
+      jogState.lastKeyPosition += (direction === 'right' ? KEY_THRESHOLD : -KEY_THRESHOLD);
+    }
+    
+    // Trigger async processing
+    processKeyQueue();
+  }
+}
+
+// Start physics animation with higher tick rate for lower latency
+function startJogPhysics() {
+  if (jogState.animationInterval) return;
+  jogState.animationInterval = setInterval(jogPhysicsTick, 8); // 125 FPS for lower latency
+}
 
 // Middleware
 app.use(express.json());
@@ -69,6 +171,28 @@ app.post('/api/disconnect', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/physics/friction', (req, res) => {
+  const { value } = req.body;
+  if (value !== undefined) {
+    globalFriction = Math.max(5, Math.min(100, value));
+    console.log(`🎛️  Friction: ${globalFriction}`);
+    res.json({ success: true, friction: globalFriction });
+  } else {
+    res.status(400).json({ error: 'Missing value' });
+  }
+});
+
+app.post('/api/physics/sensitivity', (req, res) => {
+  const { value } = req.body;
+  if (value !== undefined) {
+    globalSensitivity = Math.max(1, Math.min(100, value));
+    console.log(`🎛️  Sensitivity: ${globalSensitivity}`);
+    res.json({ success: true, sensitivity: globalSensitivity });
+  } else {
+    res.status(400).json({ error: 'Missing value' });
+  }
+});
+
 // Socket.IO events
 io.on('connection', (socket) => {
   console.log('Client connected');
@@ -100,6 +224,30 @@ reader.on('disconnected', () => {
 reader.on('data', (report) => {
   // Broadcast to all connected clients
   io.emit('report', report);
+  
+  // Handle scroll events with physics (matching HTML updateJogWheel logic)
+  report.events.forEach((event) => {
+    if (event.type === 'scroll' && (event.name === 'Jog' || event.byte === 7)) {
+      // Record input time
+      jogState.lastInputTime = Date.now();
+      
+      // Calculate target velocity based on input (matching HTML)
+      const inputSpeed = event.amount;
+      const direction = event.direction === 'up' ? 1 : -1;
+      const targetVelocity = inputSpeed * TARGET_MULTIPLIER * direction;
+      
+      // Calculate acceleration with friction (matching HTML)
+      const frictionFactor = Math.max(0.1, globalFriction / 50);
+      const accelerationRate = Math.min(0.5, 0.2 / frictionFactor);
+      
+      // Apply acceleration toward target
+      const velocityDiff = targetVelocity - jogState.velocity;
+      jogState.velocity += velocityDiff * accelerationRate;
+      
+      // Start physics animation if not already running
+      startJogPhysics();
+    }
+  });
 });
 
 reader.on('error', (err) => {

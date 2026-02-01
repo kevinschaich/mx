@@ -1280,6 +1280,13 @@
       // Rescale display: slider 5-100 maps to display 1-100
       const displayValue = Math.round(((value - 5) / 95) * 99 + 1);
       document.getElementById('frictionValue').textContent = displayValue;
+      
+      // Send to server for physics engine
+      fetch('/api/physics/friction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: parseInt(value) })
+      }).catch(err => console.error('Failed to update friction:', err));
     }
     
     // Update jog wheel visualization
@@ -1408,6 +1415,13 @@
     function updateSensitivity(value) {
       globalSensitivity = parseInt(value);
       document.getElementById('sensitivityValue').textContent = value;
+      
+      // Send to server for physics engine
+      fetch('/api/physics/sensitivity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: parseInt(value) })
+      }).catch(err => console.error('Failed to update sensitivity:', err));
     }
     
     // Update scroll wheel visualization
