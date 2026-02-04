@@ -8,373 +8,178 @@ import { keyboard, Key } from '@nut-tree-fork/nut-js';
 const app = express();
 const server = createServer(app);
 const io = new Server(server);
+const CONFIG = './config.json';
 
-const CONFIG_FILE = './config.json';
-const PORT = 8080;
-
-// Load or create config
-let config = { buttons: {}, scrollWheels: {}, friction: 50, sensitivity: 50 };
-if (existsSync(CONFIG_FILE)) {
+// Load config (friction & sensitivity only)
+let config = { friction: 50, sensitivity: 50 };
+if (existsSync(CONFIG)) {
   try {
-    config = JSON.parse(readFileSync(CONFIG_FILE, 'utf8'));
-    console.log('📝 Loaded config from file:', config);
-    // Ensure defaults exist
-    if (!config.friction) config.friction = 50;
-    if (!config.sensitivity) config.sensitivity = 50;
-    console.log('🎛️  Physics settings: friction=' + config.friction + ', sensitivity=' + config.sensitivity);
-  } catch (err) {
-    console.error('Failed to load config:', err.message);
+    config = { ...config, ...JSON.parse(readFileSync(CONFIG, 'utf8')) };
+    console.log('📝 Config loaded');
+  } catch (e) {
+    console.error('Failed to load config');
   }
 }
 
-const reader = new HIDReader(config);
+const reader = new HIDReader();
 
-// Physics state for Jog wheel (matching HTML logic exactly)
-const jogState = {
-  position: 0,
-  velocity: 0,
-  lastInputTime: 0,
-  animationInterval: null,
-  lastKeyPosition: 0
-};
+// Jog physics state
+const jog = { pos: 0, vel: 0, lastInput: 0, interval: null, lastKey: 0 };
+const trimMode = { active: false };
 
-// Trim edit mode state
-const trimEditState = {
-  isActive: false,
-  backButtonPressed: false
-};
+// Constants
+const THRESHOLD = 0.1;
+const MULTIPLIER = 2.5;
+const KEY_THRESHOLD = 10;
+let friction = config.friction;
+let sensitivity = config.sensitivity;
 
-// Physics constants (matching HTML)
-const VELOCITY_THRESHOLD = 0.1;
-const TARGET_MULTIPLIER = 2.5;
-let globalFriction = config.friction;
-let globalSensitivity = config.sensitivity;
-const KEY_THRESHOLD = 10; // Send key every 10 position units
-
-// Optimize keyboard for speed - set config once
-keyboard.config.autoDelayMs = 0; // No delay between press/release
-
-// Non-blocking keyboard queue to prevent blocking the physics loop
+// Keyboard queue
+keyboard.config.autoDelayMs = 0;
 const keyQueue = [];
-let isProcessingKeys = false;
+let processing = false;
 
-async function processKeyQueue() {
-  if (isProcessingKeys || keyQueue.length === 0) return;
+async function processKeys() {
+  if (processing || !keyQueue.length) return;
+  processing = true;
   
-  isProcessingKeys = true;
-  while (keyQueue.length > 0) {
+  while (keyQueue.length) {
     const key = keyQueue.shift();
     try {
       if (Array.isArray(key)) {
-        // Handle key combinations (e.g., [Shift, V])
-        // Press all keys in order
-        for (const k of key) {
-          await keyboard.pressKey(k);
-        }
-        // Release all keys in reverse order
-        for (let i = key.length - 1; i >= 0; i--) {
-          await keyboard.releaseKey(key[i]);
-        }
+        for (const k of key) await keyboard.pressKey(k);
+        for (let i = key.length - 1; i >= 0; i--) await keyboard.releaseKey(key[i]);
       } else {
-        // Single key
         await keyboard.type(key);
       }
-    } catch (err) {
-      console.error('Key error:', err.message);
+    } catch (e) {
+      console.error('Key error:', e.message);
     }
   }
-  isProcessingKeys = false;
+  processing = false;
 }
 
-// Physics tick function (matching HTML animateJogWheel)
-function jogPhysicsTick() {
+// Physics tick
+function tick() {
   const now = Date.now();
-  const timeSinceInput = now - jogState.lastInputTime;
   
-  // Stop if velocity is too small
-  if (Math.abs(jogState.velocity) < VELOCITY_THRESHOLD) {
-    jogState.velocity = 0;
-    if (jogState.animationInterval) {
-      clearInterval(jogState.animationInterval);
-      jogState.animationInterval = null;
-    }
+  if (Math.abs(jog.vel) < THRESHOLD) {
+    jog.vel = 0;
+    clearInterval(jog.interval);
+    jog.interval = null;
     return;
   }
   
-  // Apply friction if no recent input
-  if (timeSinceInput > 50) {
-    const frictionFactor = Math.max(0.1, globalFriction / 50);
-    const baseDecayRate = 0.92;
-    const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor)));
-    jogState.velocity *= decayRate;
-    
-    // Check again if velocity dropped below threshold
-    if (Math.abs(jogState.velocity) < VELOCITY_THRESHOLD) {
-      jogState.velocity = 0;
-      if (jogState.animationInterval) {
-        clearInterval(jogState.animationInterval);
-        jogState.animationInterval = null;
-      }
+  if (now - jog.lastInput > 50) {
+    const decay = Math.max(0.8, Math.min(0.99, 1 - (0.08 * Math.max(0.1, friction / 50))));
+    jog.vel *= decay;
+    if (Math.abs(jog.vel) < THRESHOLD) {
+      jog.vel = 0;
+      clearInterval(jog.interval);
+      jog.interval = null;
       return;
     }
   }
   
-  // Update position based on velocity with sensitivity scaling
-  const scaledVelocity = jogState.velocity * (globalSensitivity / 50);
-  jogState.position += scaledVelocity;
+  jog.pos += jog.vel * (sensitivity / 50);
   
-  // Send keyboard events based on position changes (non-blocking)
-  const positionDelta = jogState.position - jogState.lastKeyPosition;
-  if (Math.abs(positionDelta) >= KEY_THRESHOLD) {
-    const numKeys = Math.floor(Math.abs(positionDelta) / KEY_THRESHOLD);
-    const direction = positionDelta > 0 ? 'right' : 'left';
+  const delta = jog.pos - jog.lastKey;
+  if (Math.abs(delta) >= KEY_THRESHOLD) {
+    const num = Math.floor(Math.abs(delta) / KEY_THRESHOLD);
+    const dir = delta > 0;
+    const key = trimMode.active ? (dir ? Key.Period : Key.Comma) : (dir ? Key.Right : Key.Left);
     
-    // Use different keys based on trim edit mode
-    let key, symbol;
-    if (trimEditState.isActive) {
-      // In trim mode: comma for left/backwards, period for right/forwards
-      key = direction === 'right' ? Key.Period : Key.Comma;
-      symbol = direction === 'right' ? '.' : ',';
-    } else {
-      // Normal mode: arrow keys
-      key = direction === 'right' ? Key.Right : Key.Left;
-      symbol = direction === 'right' ? '→' : '←';
-    }
-    
-    // Queue keys instead of sending synchronously
-    for (let i = 0; i < numKeys; i++) {
+    for (let i = 0; i < num; i++) {
       keyQueue.push(key);
-      console.log(`⌨️  ${symbol}`);
-      jogState.lastKeyPosition += (direction === 'right' ? KEY_THRESHOLD : -KEY_THRESHOLD);
+      console.log(`⌨️  ${trimMode.active ? (dir ? '.' : ',') : (dir ? '→' : '←')}`);
+      jog.lastKey += dir ? KEY_THRESHOLD : -KEY_THRESHOLD;
     }
-    
-    // Trigger async processing
-    processKeyQueue();
+    processKeys();
   }
 }
 
-// Start physics animation with higher tick rate for lower latency
-function startJogPhysics() {
-  if (jogState.animationInterval) return;
-  jogState.animationInterval = setInterval(jogPhysicsTick, 8); // 125 FPS for lower latency
+function startPhysics() {
+  if (!jog.interval) jog.interval = setInterval(tick, 8);
 }
 
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
 
-// API Routes
-app.get('/api/devices', (req, res) => {
-  const devices = HIDReader.findMXDialpad();
-  res.json(devices.map(d => ({
-    path: d.path,
-    product: d.product,
-    manufacturer: d.manufacturer,
-    serialNumber: d.serialNumber,
-    usage: d.usage,
-    usagePage: d.usagePage
-  })));
-});
-
-app.get('/api/config', (req, res) => {
-  const responseConfig = {
-    ...config,
-    friction: globalFriction,
-    sensitivity: globalSensitivity
-  };
-  console.log('📡 GET /api/config - sending:', responseConfig);
-  res.json(responseConfig);
-});
+// API
+app.get('/api/config', (req, res) => res.json(config));
 
 app.post('/api/config', (req, res) => {
   config = req.body;
-  
-  // Preserve friction and sensitivity if they exist in the request
-  if (req.body.friction !== undefined) {
-    globalFriction = req.body.friction;
-    config.friction = globalFriction;
-  }
-  if (req.body.sensitivity !== undefined) {
-    globalSensitivity = req.body.sensitivity;
-    config.sensitivity = globalSensitivity;
-  }
-  
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-  reader.updateConfig(config);
-  res.json({ success: true });
-});
-
-app.get('/api/status', (req, res) => {
-  res.json({
-    connected: reader.isConnected,
-    reportCount: reader.reportCount
-  });
-});
-
-app.post('/api/connect', (req, res) => {
-  const { path } = req.body;
-  const success = reader.connect(path);
-  res.json({ success });
-});
-
-app.post('/api/disconnect', (req, res) => {
-  reader.disconnect();
+  if (req.body.friction != null) friction = config.friction = req.body.friction;
+  if (req.body.sensitivity != null) sensitivity = config.sensitivity = req.body.sensitivity;
+  writeFileSync(CONFIG, JSON.stringify(config, null, 2));
   res.json({ success: true });
 });
 
 app.post('/api/physics/friction', (req, res) => {
-  const { value } = req.body;
-  if (value !== undefined) {
-    globalFriction = Math.max(5, Math.min(100, value));
-    config.friction = globalFriction;
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-    console.log(`🎛️  Friction: ${globalFriction}`);
-    res.json({ success: true, friction: globalFriction });
-  } else {
-    res.status(400).json({ error: 'Missing value' });
-  }
+  friction = config.friction = Math.max(5, Math.min(100, req.body.value));
+  writeFileSync(CONFIG, JSON.stringify(config, null, 2));
+  res.json({ success: true });
 });
 
 app.post('/api/physics/sensitivity', (req, res) => {
-  const { value } = req.body;
-  if (value !== undefined) {
-    globalSensitivity = Math.max(1, Math.min(100, value));
-    config.sensitivity = globalSensitivity;
-    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
-    console.log(`🎛️  Sensitivity: ${globalSensitivity}`);
-    res.json({ success: true, sensitivity: globalSensitivity });
-  } else {
-    res.status(400).json({ error: 'Missing value' });
-  }
+  sensitivity = config.sensitivity = Math.max(1, Math.min(100, req.body.value));
+  writeFileSync(CONFIG, JSON.stringify(config, null, 2));
+  res.json({ success: true });
 });
 
-// Socket.IO events
-io.on('connection', (socket) => {
-  console.log('Client connected');
-  
-  const socketConfig = {
-    ...config,
-    friction: globalFriction,
-    sensitivity: globalSensitivity
-  };
-  console.log('📡 Socket.IO emitting config:', socketConfig);
-  
-  socket.emit('config', socketConfig);
-  socket.emit('status', {
-    connected: reader.isConnected,
-    reportCount: reader.reportCount
-  });
+// Socket.IO
+io.on('connection', socket => {
+  socket.emit('config', config);
+  socket.emit('status', { connected: reader.isConnected, reportCount: reader.reportCount });
 });
 
-// HID Reader events
-reader.on('connected', (info) => {
-  console.log('✅ Device connected:', info.path);
-  io.emit('status', {
-    connected: true,
-    reportCount: reader.reportCount
-  });
-});
+// HID events
+reader.on('connected', () => io.emit('status', { connected: true, reportCount: reader.reportCount }));
+reader.on('disconnected', () => io.emit('status', { connected: false, reportCount: reader.reportCount }));
+reader.on('error', err => io.emit('error', err.message));
 
-reader.on('disconnected', () => {
-  console.log('❌ Device disconnected');
-  io.emit('status', {
-    connected: false,
-    reportCount: reader.reportCount
-  });
-});
-
-reader.on('data', (report) => {
-  // Broadcast to all connected clients
+reader.on('data', report => {
   io.emit('report', report);
   
-  // Handle button events for trim edit mode
-  report.events.forEach((event) => {
-    if (event.type === 'button' && event.name === 'Left') {
-      if (event.action === 'press') {
-        // Left button pressed - enter trim edit mode
-        trimEditState.backButtonPressed = true;
-        trimEditState.isActive = true;
-        
-        // Enter trim edit mode in DaVinci Resolve
-        console.log('✂️  Entering trim edit mode...');
-        keyQueue.push(Key.T); // Enter trim edit mode
-        keyQueue.push(Key.V); // Select closest edit point
-        processKeyQueue();
-      } else if (event.action === 'release') {
-        // Left button released - exit trim edit mode
-        trimEditState.backButtonPressed = false;
-        trimEditState.isActive = false;
-        
-        // Exit trim edit mode in DaVinci Resolve
-        console.log('✂️  Exiting trim edit mode...');
-        keyQueue.push([Key.LeftShift, Key.V]); // Deselect edit point (Shift+V)
-        keyQueue.push(Key.A); // Go back to selection mode
-        processKeyQueue();
+  report.events.forEach(e => {
+    // Trim mode toggle (BottomLeft button)
+    if (e.type === 'button' && e.name === 'BottomLeft') {
+      if (e.action === 'press') {
+        trimMode.active = true;
+        keyQueue.push(Key.T, Key.V);
+        processKeys();
+      } else if (e.action === 'release') {
+        trimMode.active = false;
+        keyQueue.push([Key.LeftShift, Key.V], Key.A);
+        processKeys();
       }
     }
-  });
-  
-  // Handle scroll events with physics (matching HTML updateJogWheel logic)
-  report.events.forEach((event) => {
-    if (event.type === 'scroll' && (event.name === 'Jog' || event.byte === 7)) {
-      // Record input time
-      jogState.lastInputTime = Date.now();
-      
-      // Calculate target velocity based on input (matching HTML)
-      const inputSpeed = event.amount;
-      const direction = event.direction === 'up' ? 1 : -1;
-      const targetVelocity = inputSpeed * TARGET_MULTIPLIER * direction;
-      
-      // Calculate acceleration with friction (matching HTML)
-      const frictionFactor = Math.max(0.1, globalFriction / 50);
-      const accelerationRate = Math.min(0.5, 0.2 / frictionFactor);
-      
-      // Apply acceleration toward target
-      const velocityDiff = targetVelocity - jogState.velocity;
-      jogState.velocity += velocityDiff * accelerationRate;
-      
-      // Start physics animation if not already running
-      startJogPhysics();
+    
+    // Jog physics
+    if (e.type === 'scroll' && e.name === 'Jog') {
+      jog.lastInput = Date.now();
+      const target = e.amount * MULTIPLIER * (e.direction === 'up' ? 1 : -1);
+      const accel = Math.min(0.5, 0.2 / Math.max(0.1, friction / 50));
+      jog.vel += (target - jog.vel) * accel;
+      startPhysics();
     }
   });
 });
 
-reader.on('error', (err) => {
-  console.error('Device error:', err.message);
-  io.emit('error', err.message);
-});
-
-reader.on('config-updated', (newConfig) => {
-  io.emit('config', {
-    ...newConfig,
-    friction: globalFriction,
-    sensitivity: globalSensitivity
-  });
-});
-
-// Start server
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-  console.log(`📊 Ready to connect to MX Dialpad`);
-  console.log(`💡 NOTE: Only one program can connect to the device at a time`);
-  console.log(`   If the CLI (npm run cli) is running, stop it first!`);
+// Start
+server.listen(8080, '127.0.0.1', () => {
+  console.log('🚀 Server: http://localhost:8080');
   
-  // Auto-connect to the first available device
   const devices = HIDReader.findMXDialpad();
-  if (devices.length > 0) {
-    // Connect to the vendor-specific interface (Usage Page 0xff43)
-    const targetDevice = devices.find(d => d.usagePage === 0xff43) || devices[0];
-    console.log(`🔌 Auto-connecting to: ${targetDevice.product} (Usage Page: 0x${targetDevice.usagePage.toString(16)})`);
-    const success = reader.connect(targetDevice.path);
-    if (!success) {
-      console.log(`⚠️  Connection failed - device may be in use by another program (check if CLI is running)`);
-    }
+  if (devices.length) {
+    const device = devices.find(d => d.usagePage === 0xff43) || devices[0];
+    if (!reader.connect(device.path)) console.log('⚠️  Connection failed');
   }
 });
 
-// Cleanup on exit
 process.on('SIGINT', () => {
-  console.log('\n👋 Shutting down...');
   reader.disconnect();
   process.exit(0);
 });
