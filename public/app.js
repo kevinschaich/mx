@@ -90,7 +90,7 @@ window.set = (k, v) => {
   const val = Math.round(v);
   if (k === 'friction') { f = cfg.friction = val; el('frictionVal').textContent = val; }
   else { s = cfg.sensitivity = val; el('sensitivityVal').textContent = val; }
-  fetch(`/api/physics/${k}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: val }) });
+  fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friction: f, sensitivity: s }) });
 };
 
 window.reset = type => {

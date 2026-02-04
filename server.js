@@ -89,18 +89,6 @@ app.post('/api/config', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/physics/friction', (req, res) => {
-  friction = config.friction = Math.max(5, Math.min(100, req.body.value));
-  writeFileSync(CONFIG, JSON.stringify(config, null, 2));
-  res.json({ success: true });
-});
-
-app.post('/api/physics/sensitivity', (req, res) => {
-  sensitivity = config.sensitivity = Math.max(1, Math.min(100, req.body.value));
-  writeFileSync(CONFIG, JSON.stringify(config, null, 2));
-  res.json({ success: true });
-});
-
 // Socket.IO
 io.on('connection', socket => {
   socket.emit('config', config);
