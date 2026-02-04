@@ -23,14 +23,9 @@ if (existsSync(CONFIG)) {
 
 const reader = new HIDReader();
 
-// Jog physics state
-const jog = { pos: 0, vel: 0, lastInput: 0, interval: null, lastKey: 0 };
+// Jog state - just smoothing + sensitivity
+const jog = { smoothed: 0, pos: 0, lastKey: 0 };
 const trimMode = { active: false };
-
-// Constants
-const THRESHOLD = 0.1;
-const MULTIPLIER = 2.5;
-const KEY_THRESHOLD = 10;
 let friction = config.friction;
 let sensitivity = config.sensitivity;
 
@@ -42,7 +37,6 @@ let processing = false;
 async function processKeys() {
   if (processing || !keyQueue.length) return;
   processing = true;
-  
   while (keyQueue.length) {
     const key = keyQueue.shift();
     try {
@@ -59,47 +53,25 @@ async function processKeys() {
   processing = false;
 }
 
-// Physics tick
-function tick() {
-  const now = Date.now();
-  
-  if (Math.abs(jog.vel) < THRESHOLD) {
-    jog.vel = 0;
-    clearInterval(jog.interval);
-    jog.interval = null;
-    return;
-  }
-  
-  if (now - jog.lastInput > 50) {
-    const decay = Math.max(0.8, Math.min(0.99, 1 - (0.08 * Math.max(0.1, friction / 50))));
-    jog.vel *= decay;
-    if (Math.abs(jog.vel) < THRESHOLD) {
-      jog.vel = 0;
-      clearInterval(jog.interval);
-      jog.interval = null;
-      return;
-    }
-  }
-  
-  jog.pos += jog.vel * (sensitivity / 50);
+function handleJog(amount, direction) {
+  const input = amount * (direction === 'up' ? 1 : -1);
+  const smoothing = (100 - friction) / 100; // Low friction = high smoothing
+  jog.smoothed = jog.smoothed * (1 - smoothing) + input * smoothing;
+  jog.pos += jog.smoothed * (sensitivity / 50);
   
   const delta = jog.pos - jog.lastKey;
-  if (Math.abs(delta) >= KEY_THRESHOLD) {
-    const num = Math.floor(Math.abs(delta) / KEY_THRESHOLD);
+  const threshold = 10;
+  if (Math.abs(delta) >= threshold) {
+    const num = Math.floor(Math.abs(delta) / threshold);
     const dir = delta > 0;
     const key = trimMode.active ? (dir ? Key.Period : Key.Comma) : (dir ? Key.Right : Key.Left);
-    
     for (let i = 0; i < num; i++) {
       keyQueue.push(key);
       console.log(`⌨️  ${trimMode.active ? (dir ? '.' : ',') : (dir ? '→' : '←')}`);
-      jog.lastKey += dir ? KEY_THRESHOLD : -KEY_THRESHOLD;
+      jog.lastKey += dir ? threshold : -threshold;
     }
     processKeys();
   }
-}
-
-function startPhysics() {
-  if (!jog.interval) jog.interval = setInterval(tick, 8);
 }
 
 // Middleware
@@ -157,13 +129,9 @@ reader.on('data', report => {
       }
     }
     
-    // Jog physics
+    // Jog smoothing
     if (e.type === 'scroll' && e.name === 'Jog') {
-      jog.lastInput = Date.now();
-      const target = e.amount * MULTIPLIER * (e.direction === 'up' ? 1 : -1);
-      const accel = Math.min(0.5, 0.2 / Math.max(0.1, friction / 50));
-      jog.vel += (target - jog.vel) * accel;
-      startPhysics();
+      handleJog(e.amount, e.direction);
     }
   });
 });
