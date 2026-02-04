@@ -292,26 +292,26 @@
             <div style="flex: 1;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="font-weight: 500;">Friction:</label>
-                <span style="font-weight: bold; color: #667eea;" id="frictionValue">48</span>
+                <span style="font-weight: bold; color: #667eea;" id="frictionValue">Loading...</span>
               </div>
-              <input type="range" id="frictionSlider" min="5" max="100" value="50" 
+              <input type="range" id="frictionSlider" min="5" max="100" value="50" step="1"
                      oninput="updateFriction(this.value)"
                      style="width: 100%; cursor: pointer;">
               <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                Lower = more momentum
+                Lower = more momentum (5-100)
               </div>
             </div>
             <!-- Sensitivity Control -->
             <div style="flex: 1;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="font-weight: 500;">Sensitivity:</label>
-                <span style="font-weight: bold; color: #52c41a;" id="sensitivityValue">50</span>
+                <span style="font-weight: bold; color: #52c41a;" id="sensitivityValue">Loading...</span>
               </div>
-              <input type="range" id="sensitivitySlider" min="1" max="100" value="50" 
+              <input type="range" id="sensitivitySlider" min="1" max="100" value="50" step="1"
                      oninput="updateSensitivity(this.value)"
                      style="width: 100%; cursor: pointer;">
               <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                Output movement scale
+                Output movement scale (1-100)
               </div>
             </div>
           </div>
@@ -481,7 +481,7 @@
       <div class="card">
         <h2>Actions</h2>
         <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
-          💡 Quick-add from logs auto-saves! Use this button if you manually edit mappings above.
+          💡 Physics settings (friction/sensitivity) and quick-add mappings auto-save! Use this button if you manually edit mappings.
         </p>
         <button class="success" onclick="saveConfig()">💾 Save Configuration</button>
         <button class="danger" onclick="clearConfig()">🗑️ Clear All Mappings</button>
@@ -553,11 +553,11 @@
     const VELOCITY_THRESHOLD = 0.1; // Stop animating below this velocity
     const TARGET_MULTIPLIER = 2.5; // How much to scale input speed for target velocity
     
-    // Global friction setting (0-100, where 50 is baseline)
-    let globalFriction = 50;
+    // Global friction setting (loaded from config)
+    let globalFriction = null;
     
-    // Global sensitivity setting (1-100, where 50 is baseline)
-    let globalSensitivity = 50;
+    // Global sensitivity setting (loaded from config)
+    let globalSensitivity = null;
     
     // Socket events
     socket.on('connect', () => {
@@ -575,10 +575,66 @@
     });
     
     socket.on('config', (data) => {
+      console.log('📝 Socket received config:', data);
       config = data;
       renderMappings();
-      console.log('📝 Config loaded:', config);
+      loadPhysicsSettings();
     });
+    
+    // Load physics settings from config
+    function loadPhysicsSettings() {
+      console.log('🎛️  loadPhysicsSettings called');
+      console.log('🎛️  Current config object:', JSON.stringify(config));
+      
+      if (!config) {
+        console.error('❌ Config is null/undefined!');
+        return;
+      }
+      
+      // Load friction from config (default to 50 if not set)
+      const friction = config.friction !== undefined && config.friction !== null ? config.friction : 50;
+      console.log(`🎛️  Friction value from config: ${config.friction} -> using: ${friction}`);
+      globalFriction = friction;
+      
+      const frictionSlider = document.getElementById('frictionSlider');
+      const frictionValue = document.getElementById('frictionValue');
+      
+      console.log(`🎛️  Friction slider element:`, frictionSlider);
+      console.log(`🎛️  Friction value element:`, frictionValue);
+      
+      if (frictionSlider && frictionValue) {
+        console.log(`🎛️  Setting friction slider to: ${friction}`);
+        frictionSlider.value = friction;
+        console.log(`🎛️  Setting friction display to: ${friction}`);
+        frictionValue.textContent = friction;
+        console.log(`✅ Friction set to ${friction}, slider.value=${frictionSlider.value}`);
+      } else {
+        console.error('❌ Could not find friction elements!');
+      }
+      
+      // Load sensitivity from config (default to 50 if not set)
+      const sensitivity = config.sensitivity !== undefined && config.sensitivity !== null ? config.sensitivity : 50;
+      console.log(`🎛️  Sensitivity value from config: ${config.sensitivity} -> using: ${sensitivity}`);
+      globalSensitivity = sensitivity;
+      
+      const sensitivitySlider = document.getElementById('sensitivitySlider');
+      const sensitivityValue = document.getElementById('sensitivityValue');
+      
+      console.log(`🎛️  Sensitivity slider element:`, sensitivitySlider);
+      console.log(`🎛️  Sensitivity value element:`, sensitivityValue);
+      
+      if (sensitivitySlider && sensitivityValue) {
+        console.log(`🎛️  Setting sensitivity slider to: ${sensitivity}`);
+        sensitivitySlider.value = sensitivity;
+        console.log(`🎛️  Setting sensitivity display to: ${sensitivity}`);
+        sensitivityValue.textContent = sensitivity;
+        console.log(`✅ Sensitivity set to ${sensitivity}, slider.value=${sensitivitySlider.value}`);
+      } else {
+        console.error('❌ Could not find sensitivity elements!');
+      }
+      
+      console.log(`🎛️  Final physics state: friction=${globalFriction}, sensitivity=${globalSensitivity}`);
+    }
     
     socket.on('status', (data) => {
       updateStatus(data);
@@ -610,6 +666,12 @@
     function renderMappings() {
       const buttonContainer = document.getElementById('buttonMappings');
       const scrollContainer = document.getElementById('scrollMappings');
+      
+      // Skip rendering if containers don't exist (they were removed from UI)
+      if (!buttonContainer || !scrollContainer) {
+        console.log('⚠️  Mapping containers not found in DOM, skipping render');
+        return;
+      }
       
       buttonContainer.innerHTML = '';
       scrollContainer.innerHTML = '';
@@ -686,6 +748,10 @@
     
     // Save config
     async function saveConfig() {
+      // Ensure friction and sensitivity are included in the config
+      config.friction = globalFriction;
+      config.sensitivity = globalSensitivity;
+      
       const response = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -702,7 +768,12 @@
     // Clear config
     function clearConfig() {
       if (confirm('⚠️ Are you sure you want to clear all mappings?\n\nThis will remove all button and scroll wheel mappings.\n\nDon\'t forget to save after clearing!')) {
-        config = { buttons: {}, scrollWheels: {} };
+        config = { 
+          buttons: {}, 
+          scrollWheels: {},
+          friction: globalFriction,
+          sensitivity: globalSensitivity
+        };
         renderMappings();
         showToast('🗑️ All mappings cleared (save to persist)');
       }
@@ -1265,6 +1336,8 @@
     
     // Initialize curve visualization on load
     window.addEventListener('load', () => {
+      console.log('🚀 Page loaded, initializing...');
+      
       drawJogCurve();
       drawScrollCurve();
       drawJogTimeline();
@@ -1272,20 +1345,44 @@
       // Start timeline update loops
       setInterval(updateJogTimeline, 50); // Update 20 times per second
       setInterval(updateScrollTimeline, 50);
+      
+      // Fetch initial config from server
+      console.log('📡 Fetching config from /api/config...');
+      fetch('/api/config')
+        .then(res => {
+          console.log('📡 Fetch response status:', res.status);
+          return res.json();
+        })
+        .then(data => {
+          console.log('📝 Initial config loaded from API:', data);
+          config = data;
+          renderMappings();
+          loadPhysicsSettings();
+        })
+        .catch(err => {
+          console.error('❌ Failed to load config:', err);
+          // Load defaults if fetch fails
+          config = { buttons: {}, scrollWheels: {}, friction: 50, sensitivity: 50 };
+          loadPhysicsSettings();
+        });
     });
     
     // Update global friction
     function updateFriction(value) {
-      globalFriction = parseInt(value);
-      // Rescale display: slider 5-100 maps to display 1-100
-      const displayValue = Math.round(((value - 5) / 95) * 99 + 1);
-      document.getElementById('frictionValue').textContent = displayValue;
+      const friction = Math.round(parseFloat(value));
+      globalFriction = friction;
+      if (config) config.friction = friction;
       
-      // Send to server for physics engine
+      // Show actual value (5-100 range)
+      document.getElementById('frictionValue').textContent = friction;
+      
+      console.log(`🎛️  Friction updated to ${friction}`);
+      
+      // Send to server for physics engine (auto-saves to config.json)
       fetch('/api/physics/friction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: parseInt(value) })
+        body: JSON.stringify({ value: friction })
       }).catch(err => console.error('Failed to update friction:', err));
     }
     
@@ -1303,10 +1400,11 @@
       // Record input event for timeline
       recordJogInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
       
-      // Calculate acceleration with friction
+      // Calculate acceleration with friction (use default 50 if not loaded yet)
       // Lower friction (5-49) = faster acceleration and slower deceleration (more momentum)
       // Higher friction (51-100) = slower acceleration and faster deceleration (more resistance)
-      const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to 0.1 to prevent division issues
+      const friction = globalFriction !== null ? globalFriction : 50;
+      const frictionFactor = Math.max(0.1, friction / 50); // Clamp minimum to 0.1 to prevent division issues
       const accelerationRate = Math.min(0.5, 0.2 / frictionFactor); // Cap max acceleration rate
       
       // Apply acceleration toward target
@@ -1413,14 +1511,19 @@
     
     // Update global sensitivity
     function updateSensitivity(value) {
-      globalSensitivity = parseInt(value);
-      document.getElementById('sensitivityValue').textContent = value;
+      const sensitivity = Math.round(parseFloat(value));
+      globalSensitivity = sensitivity;
+      if (config) config.sensitivity = sensitivity;
       
-      // Send to server for physics engine
+      document.getElementById('sensitivityValue').textContent = sensitivity;
+      
+      console.log(`🎛️  Sensitivity updated to ${sensitivity}`);
+      
+      // Send to server for physics engine (auto-saves to config.json)
       fetch('/api/physics/sensitivity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: parseInt(value) })
+        body: JSON.stringify({ value: sensitivity })
       }).catch(err => console.error('Failed to update sensitivity:', err));
     }
     
@@ -1438,10 +1541,11 @@
       // Record input event for timeline
       recordScrollInputEvent(targetVelocity, inputSpeed * TARGET_MULTIPLIER);
       
-      // Calculate acceleration with friction
+      // Calculate acceleration with friction (use default 50 if not loaded yet)
       // Lower friction (5-49) = faster acceleration and slower deceleration (more momentum)
       // Higher friction (51-100) = slower acceleration and faster deceleration (more resistance)
-      const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to 0.1 to prevent division issues
+      const friction = globalFriction !== null ? globalFriction : 50;
+      const frictionFactor = Math.max(0.1, friction / 50); // Clamp minimum to 0.1 to prevent division issues
       const accelerationRate = Math.min(0.5, 0.2 / frictionFactor); // Cap max acceleration rate
       
       // Apply acceleration toward target
@@ -1506,10 +1610,11 @@
       
       // Apply friction if no recent input
       if (timeSinceInput > 50) {
-        // Apply friction-based exponential decay
+        // Apply friction-based exponential decay (use default 50 if not loaded yet)
         // Lower friction (5-49) = slower decay (more momentum/coasting)
         // Higher friction (51-100) = faster decay (quicker stop)
-        const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to prevent issues
+        const friction = globalFriction !== null ? globalFriction : 50;
+        const frictionFactor = Math.max(0.1, friction / 50); // Clamp minimum to prevent issues
         const baseDecayRate = 0.92; // Base decay at friction = 50
         // Scale decay rate: lower friction = closer to 1 (slower decay), higher friction = further from 1 (faster decay)
         const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor))); // Clamp between 0.8 and 0.99
@@ -1525,8 +1630,9 @@
         }
       }
       
-      // Update position based on velocity with sensitivity scaling
-      const scaledVelocity = jogWheelData.velocity * (globalSensitivity / 50); // 50 is baseline (1x)
+      // Update position based on velocity with sensitivity scaling (use default 50 if not loaded yet)
+      const sensitivity = globalSensitivity !== null ? globalSensitivity : 50;
+      const scaledVelocity = jogWheelData.velocity * (sensitivity / 50); // 50 is baseline (1x)
       jogWheelData.position += scaledVelocity;
       
       // Update UI
@@ -1561,10 +1667,11 @@
       
       // Apply friction if no recent input
       if (timeSinceInput > 50) {
-        // Apply friction-based exponential decay
+        // Apply friction-based exponential decay (use default 50 if not loaded yet)
         // Lower friction (5-49) = slower decay (more momentum/coasting)
         // Higher friction (51-100) = faster decay (quicker stop)
-        const frictionFactor = Math.max(0.1, globalFriction / 50); // Clamp minimum to prevent issues
+        const friction = globalFriction !== null ? globalFriction : 50;
+        const frictionFactor = Math.max(0.1, friction / 50); // Clamp minimum to prevent issues
         const baseDecayRate = 0.92; // Base decay at friction = 50
         // Scale decay rate: lower friction = closer to 1 (slower decay), higher friction = further from 1 (faster decay)
         const decayRate = Math.max(0.8, Math.min(0.99, 1 - ((1 - baseDecayRate) * frictionFactor))); // Clamp between 0.8 and 0.99
@@ -1578,8 +1685,9 @@
         }
       }
       
-      // Update position based on velocity with sensitivity scaling
-      const scaledVelocity = scrollWheelData.velocity * (globalSensitivity / 50); // 50 is baseline (1x)
+      // Update position based on velocity with sensitivity scaling (use default 50 if not loaded yet)
+      const sensitivity = globalSensitivity !== null ? globalSensitivity : 50;
+      const scaledVelocity = scrollWheelData.velocity * (sensitivity / 50); // 50 is baseline (1x)
       scrollWheelData.position += scaledVelocity;
       
       // Update UI

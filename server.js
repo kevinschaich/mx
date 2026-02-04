@@ -13,10 +13,15 @@ const CONFIG_FILE = './config.json';
 const PORT = 8080;
 
 // Load or create config
-let config = { buttons: {}, scrollWheels: {} };
+let config = { buttons: {}, scrollWheels: {}, friction: 50, sensitivity: 50 };
 if (existsSync(CONFIG_FILE)) {
   try {
     config = JSON.parse(readFileSync(CONFIG_FILE, 'utf8'));
+    console.log('📝 Loaded config from file:', config);
+    // Ensure defaults exist
+    if (!config.friction) config.friction = 50;
+    if (!config.sensitivity) config.sensitivity = 50;
+    console.log('🎛️  Physics settings: friction=' + config.friction + ', sensitivity=' + config.sensitivity);
   } catch (err) {
     console.error('Failed to load config:', err.message);
   }
@@ -33,11 +38,17 @@ const jogState = {
   lastKeyPosition: 0
 };
 
+// Trim edit mode state
+const trimEditState = {
+  isActive: false,
+  backButtonPressed: false
+};
+
 // Physics constants (matching HTML)
 const VELOCITY_THRESHOLD = 0.1;
 const TARGET_MULTIPLIER = 2.5;
-let globalFriction = 50;
-let globalSensitivity = 50;
+let globalFriction = config.friction;
+let globalSensitivity = config.sensitivity;
 const KEY_THRESHOLD = 10; // Send key every 10 position units
 
 // Optimize keyboard for speed - set config once
@@ -54,7 +65,20 @@ async function processKeyQueue() {
   while (keyQueue.length > 0) {
     const key = keyQueue.shift();
     try {
-      await keyboard.type(key);
+      if (Array.isArray(key)) {
+        // Handle key combinations (e.g., [Shift, V])
+        // Press all keys in order
+        for (const k of key) {
+          await keyboard.pressKey(k);
+        }
+        // Release all keys in reverse order
+        for (let i = key.length - 1; i >= 0; i--) {
+          await keyboard.releaseKey(key[i]);
+        }
+      } else {
+        // Single key
+        await keyboard.type(key);
+      }
     } catch (err) {
       console.error('Key error:', err.message);
     }
@@ -104,8 +128,18 @@ function jogPhysicsTick() {
   if (Math.abs(positionDelta) >= KEY_THRESHOLD) {
     const numKeys = Math.floor(Math.abs(positionDelta) / KEY_THRESHOLD);
     const direction = positionDelta > 0 ? 'right' : 'left';
-    const key = direction === 'right' ? Key.Right : Key.Left;
-    const symbol = direction === 'right' ? '→' : '←';
+    
+    // Use different keys based on trim edit mode
+    let key, symbol;
+    if (trimEditState.isActive) {
+      // In trim mode: comma for left/backwards, period for right/forwards
+      key = direction === 'right' ? Key.Period : Key.Comma;
+      symbol = direction === 'right' ? '.' : ',';
+    } else {
+      // Normal mode: arrow keys
+      key = direction === 'right' ? Key.Right : Key.Left;
+      symbol = direction === 'right' ? '→' : '←';
+    }
     
     // Queue keys instead of sending synchronously
     for (let i = 0; i < numKeys; i++) {
@@ -143,11 +177,28 @@ app.get('/api/devices', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json(config);
+  const responseConfig = {
+    ...config,
+    friction: globalFriction,
+    sensitivity: globalSensitivity
+  };
+  console.log('📡 GET /api/config - sending:', responseConfig);
+  res.json(responseConfig);
 });
 
 app.post('/api/config', (req, res) => {
   config = req.body;
+  
+  // Preserve friction and sensitivity if they exist in the request
+  if (req.body.friction !== undefined) {
+    globalFriction = req.body.friction;
+    config.friction = globalFriction;
+  }
+  if (req.body.sensitivity !== undefined) {
+    globalSensitivity = req.body.sensitivity;
+    config.sensitivity = globalSensitivity;
+  }
+  
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   reader.updateConfig(config);
   res.json({ success: true });
@@ -175,6 +226,8 @@ app.post('/api/physics/friction', (req, res) => {
   const { value } = req.body;
   if (value !== undefined) {
     globalFriction = Math.max(5, Math.min(100, value));
+    config.friction = globalFriction;
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
     console.log(`🎛️  Friction: ${globalFriction}`);
     res.json({ success: true, friction: globalFriction });
   } else {
@@ -186,6 +239,8 @@ app.post('/api/physics/sensitivity', (req, res) => {
   const { value } = req.body;
   if (value !== undefined) {
     globalSensitivity = Math.max(1, Math.min(100, value));
+    config.sensitivity = globalSensitivity;
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
     console.log(`🎛️  Sensitivity: ${globalSensitivity}`);
     res.json({ success: true, sensitivity: globalSensitivity });
   } else {
@@ -197,7 +252,14 @@ app.post('/api/physics/sensitivity', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Client connected');
   
-  socket.emit('config', config);
+  const socketConfig = {
+    ...config,
+    friction: globalFriction,
+    sensitivity: globalSensitivity
+  };
+  console.log('📡 Socket.IO emitting config:', socketConfig);
+  
+  socket.emit('config', socketConfig);
   socket.emit('status', {
     connected: reader.isConnected,
     reportCount: reader.reportCount
@@ -224,6 +286,33 @@ reader.on('disconnected', () => {
 reader.on('data', (report) => {
   // Broadcast to all connected clients
   io.emit('report', report);
+  
+  // Handle button events for trim edit mode
+  report.events.forEach((event) => {
+    if (event.type === 'button' && event.name === 'Left') {
+      if (event.action === 'press') {
+        // Left button pressed - enter trim edit mode
+        trimEditState.backButtonPressed = true;
+        trimEditState.isActive = true;
+        
+        // Enter trim edit mode in DaVinci Resolve
+        console.log('✂️  Entering trim edit mode...');
+        keyQueue.push(Key.T); // Enter trim edit mode
+        keyQueue.push(Key.V); // Select closest edit point
+        processKeyQueue();
+      } else if (event.action === 'release') {
+        // Left button released - exit trim edit mode
+        trimEditState.backButtonPressed = false;
+        trimEditState.isActive = false;
+        
+        // Exit trim edit mode in DaVinci Resolve
+        console.log('✂️  Exiting trim edit mode...');
+        keyQueue.push([Key.LeftShift, Key.V]); // Deselect edit point (Shift+V)
+        keyQueue.push(Key.A); // Go back to selection mode
+        processKeyQueue();
+      }
+    }
+  });
   
   // Handle scroll events with physics (matching HTML updateJogWheel logic)
   report.events.forEach((event) => {
@@ -256,7 +345,11 @@ reader.on('error', (err) => {
 });
 
 reader.on('config-updated', (newConfig) => {
-  io.emit('config', newConfig);
+  io.emit('config', {
+    ...newConfig,
+    friction: globalFriction,
+    sensitivity: globalSensitivity
+  });
 });
 
 // Start server

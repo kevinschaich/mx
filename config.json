@@ -8,5 +8,7 @@
   "scrollWheels": {
     "6": "Scroll",
     "7": "Jog"
-  }
+  },
+  "friction": 10,
+  "sensitivity": 10
 }
